@@ -1,0 +1,63 @@
+main: {
+	for i in 1...2 {
+		for j in 1..<4 {
+			let printCurrentCalculation = printCalculation :: i :: j;
+			printCurrentCalculation("+", sum);
+			printCurrentCalculation("*", mul);
+		}
+	}
+
+	let boolToString = compose :: toInt :: toString;
+
+	print "true = ", boolToString(true);
+	print "false = ", boolToString(false);
+
+	var result = 5;
+	while result > 0 {
+		print toString(result), " ";
+		result--;
+		if result == 0 {
+			print "the end\n";
+		}
+	}
+
+	print "5th fibo number = ", toString(fibo(5));
+}
+
+func printCalculation(a: Int, b: Int, operator: String, func: Int -> Int -> Int) -> Int {
+	let aStr = toString(a);
+	let bStr = toString(b);
+	let resStr = toString(func(a, b));
+	print aStr, operator, bStr, "=", resStr, "\n";
+	return 0;
+}
+
+func sum(a: Int, b: Int) -> Int {
+	return a + b;
+}
+
+func mul(a: Int, b: Int) -> Int {
+	return a * b;
+}
+
+func compose(f1: Bool -> Int, f2: Int -> String) -> (Bool -> String) {
+	return lambda (x: Bool) -> String {
+		return f2(f1(x));
+	};
+}
+
+func toInt(x: Bool) -> Int {
+	if x {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+func fibo(x: Int) -> Int {
+	if x <= 3 {
+		return 1;
+	} else {
+		return fibo(x - 1) + fibo(x - 2);
+	}
+}

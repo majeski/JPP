@@ -1,0 +1,133 @@
+\documentclass{article}
+\usepackage[a4paper, total={6in, 10.5in}]{geometry}
+\usepackage[rounded]{syntax}
+\usepackage{url}
+
+\author{Michał Majewski}
+	
+\begin{document}
+
+\section{Literals}
+\begin{grammar}
+<literal> ::= <integer-literal> | <string-literal> | <bool-literal>
+
+<integer-literal> ::= ["-"], <digit>, \{<digit>\}
+
+<digit> ::= "0" | ... | "9"
+
+<string-literal> ::= "\"", \{<ASCII-character>\}, "\""
+
+<bool-literal> ::= "true" | "false"
+
+\end{grammar}
+
+\section{Types}
+\begin{grammar}
+<type> ::= <simple-type> | <function-type>
+
+<simple-type> ::= "Int" | "Bool" | "String"
+
+<function-type> ::= <function-type-no-arguments> | <function-type-with-arguments>
+
+<function-type-no-arguments> ::= "Void ->" <function-arg-type>
+
+<function-type-with-arguments> ::= <function-arg-type> \{"->" <function-arg-type>\} "->" <function-arg-type>
+
+<function-arg-type> ::= <simple-type> | <function-arg-function-type>
+
+<function-arg-function-type> ::= "(" <function-type> ")"
+
+\end{grammar}
+
+\section{Expressions}
+\begin{grammar}
+<expression> ::= <expression-0> \{"::" <expression-0>\}
+
+<expression-0> ::= <expression-1> | <logical-expression>
+
+<logical-expression> ::= <logical-expression-1> \{"||" <logical-expression-1>\}
+
+<logical-expression-1> ::= <logical-expression-2> \{"&&" <logical-expression-2>\}
+
+<logical-expression-2> ::= <expression-1> <logical-operator> <expression-1>
+
+<logical-operator> ::= "\textless" | "\textgreater" | "\textless=" | "\textgreater=" | "==" | "!="
+
+<expression-1> ::= <expression-2> \{("+" | "-") <expression-2>\}
+
+<expression-2> ::= <term> \{("*" | "/" | "%") <term>\}
+
+<term> ::= <literal> | <identifier> | <call-expression> | <parentheses-expression> | <lambda-expression>
+
+<call-expression> ::= <term> "(" [<expressions-list>] ")"
+
+<expressions-list> ::= <expression> ["," <expressions-list>]
+
+<parentheses-expression> ::= "(" <expression> ")"
+
+<lambda-expression> ::= "lambda" <arguments-list> "->" <function-arg-type> <code-block>
+\end{grammar}
+
+
+\section{Statements}
+\begin{grammar}
+<statement> ::= ((<declaration> | <print-statement> | <assign-statement> | <postfix-statement>) ";") | <flow-statement> | <statements-list>
+
+<statements-list> ::= <statement> [<statements-list>]
+
+<print-statement> ::= "print" <expressions-list>
+
+<assign-statement> ::= <identifier> <assign-operator> <expression>
+
+<assign-operator> ::= "=" | "-=" | "+=" | "*=" | "/=" | "%="
+
+<postfix-statement> ::= <identifier> ("++" | "--")
+
+<flow-statement> ::= <if-statement> | <while-statement> | <for-statement> | <return-statement>
+
+<if-statement> ::= "if" <expression> <code-block> ["else" <code-block>]
+
+<while-statement> ::= "while" <expression> <code-block>
+
+<for-statement> ::= "for" <identifier> "in" <range> <code-block>
+
+<range> ::= <expression> ("..." | "..<") <expression>
+
+<return-statement> ::= "return" <expression>
+
+<code-block> ::= "{" [<statements-list>] "}"
+\end{grammar}
+
+\section{Declarations}
+\begin{grammar}
+<simple-declaration> ::= <variable-declaration> | <constant-declaration> | <function-declaration>
+
+<constant-declaration> ::= "let" (<identifier> | <typed-identifier>) "=" <expression>
+
+<variable-declaration> ::= "var" (<identifier> | <typed-identifier>) "=" <expression>
+
+<function-declaration> ::= "func" <identifier> <arguments-list> <function-type-tail> <code-block>
+
+<arguments-list> ::= "(" [<typed-identifiers-list>] ")"
+
+<typed-identifiers-list> ::= <typed-identifier> [", " <typed-identifiers-list>]
+
+<typed-identifier> ::= <identifier> ":" <type>
+
+<identifier> ::= (<letter> | "_"), \{<letter> | <digit> | "_"\}
+
+<letter> ::= "a" | ... | "z" | "A" | ... | "Z"
+\end{grammar}
+
+\section{Program}
+\begin{grammar}
+
+<Program> ::= "main:" <code-block> [<functions-list>]
+
+<functions-list> ::= <function-declaration> [<functions-list>]
+
+\end{grammar}
+
+
+
+\end{document}

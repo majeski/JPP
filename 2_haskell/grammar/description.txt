@@ -1,0 +1,85 @@
+This is a statically typed imperative language inspired by Swift.
+It uses 3 builtin types: Bool, Int and String and allows to create functions with any type that is a combination of the builtin types.
+Runtime errors (e.g. division by 0) are handled by interpreter.
+It treats functions as first-class citizens. There are recursive global functions and local lambdas.
+
+Non-obvious elements:
+
+1. let and var
+var - variable
+let - constant
+the only difference is that operators = += -= *= /= %= ++ -- cannot be applied on a constant
+
+
+2. For loop:
+for <identifier> in <range> { }
+<identifier> behaves like a constant
+<range> is either: <expr> ... <expr> or <expr> ..< <expr>. 
+Range example:
+1 ... 5 means from 1 to 5 inclusively
+1 ..< 5 means from 1 to (5-1) inclusively
+
+let <identifier> = <expr>;
+var <identifier> = <expr>;
+
+there is no need to write a type for a new variable/constant, it's deduced from given expression
+
+
+3. Print
+print <expr>, <expr>, ...
+where each <expr> should be of type String
+
+
+4. Functions and lambdas
+Functions can be declared only in the global scope.
+Lambdas can be declared only in local scope.
+Their arguments are constant. Lambdas have access to the outer scope, they retain constant copy of every variable in scope at declaration.
+Functions and lambdas always return some value, but they may have no arguments.
+
+Both declarations are very similar:
+
+global function:
+func <identifier> (arg1: Type1, arg2: Type2, ...) -> ReturnType { };
+
+lambda:
+let/var <identifier> = lambda (arg1: Type1, arg2: Type2, ...) -> ReturnType { };
+
+Type is either Bool, Int, String or a function type. Function/lambda type can be either:
+Void -> ReturnType (Void means simply no arguments)
+or
+ArgType1 -> ArgType2 -> ... -> ReturnType
+
+If a function/lambda has an argument of a function type, then the type of this argument must be enclosed in parentheses, e.g.
+func function(a: Int, f: Int -> Bool, b: String) -> Bool { }
+has a type:
+Int -> (Int -> Bool) -> String -> Bool
+
+
+5. Builtin functions
+fromString (type: Int -> String)
+toString (type: String -> Int)
+
+
+6. Functions binding
+ff :: arg_1 :: arg_2 :: ... :: arg_k
+the result is a new function with the same arguments as ff expect the first k arguments which are filled with values of arg_1, arg_2, ..., arg_k
+
+
+7. Scopes
+You can redeclare indentifier from the outer scope (even if its type is different), but not from the same scope.
+
+
+8. The global scope
+Program starts running from the main block. Outside that block are function declarations. Functions defined at global scope are mutually recursive.
+
+
+9. Operators in descending precedence (every operator is left associative)
+() - call operator
+* / %
++ -
+&&
+||
+:: - bind operator
+= += -= *= /= %= ++ --
+
+
