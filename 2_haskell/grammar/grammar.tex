@@ -71,7 +71,8 @@
 
 \section{Statements}
 \begin{grammar}
-<statement> ::= ((<declaration> | <print-statement> | <assign-statement> | <postfix-statement>) ";") | <flow-statement> | <statements-list>
+<statement> ::= ((<declaration> | <print-statement> | <assign-statement> | <postfix-statement> |
+<expression>) ";") | <flow-statement> | <statements-list>
 
 <statements-list> ::= <statement> [<statements-list>]
 

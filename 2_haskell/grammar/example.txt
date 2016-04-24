@@ -24,10 +24,10 @@ main: {
 	print "5th fibo number = ", toString(fibo(5));
 }
 
-func printCalculation(a: Int, b: Int, operator: String, func: Int -> Int -> Int) -> Int {
+func printCalculation(a: Int, b: Int, operator: String, f: Int -> Int -> Int) -> Int {
 	let aStr = toString(a);
 	let bStr = toString(b);
-	let resStr = toString(func(a, b));
+	let resStr = toString(f(a, b));
 	print aStr, operator, bStr, "=", resStr, "\n";
 	return 0;
 }
