@@ -7,7 +7,7 @@ main: {
 		}
 	}
 
-	let boolToString = compose :: toInt :: toString;
+	let boolToString = (compose :: toInt :: toString)();
 
 	print "true = ", boolToString(true);
 	print "false = ", boolToString(false);
@@ -17,7 +17,7 @@ main: {
 		print toString(result), " ";
 		result--;
 		if result == 0 {
-			print "the end\n";
+			print "the end";
 		}
 	}
 
@@ -26,9 +26,9 @@ main: {
 
 func printCalculation(a: Int, b: Int, operator: String, f: Int -> Int -> Int) -> Int {
 	let aStr = toString(a);
-	let bStr = toString(b);
+	let bStr: String = toString(b);
 	let resStr = toString(f(a, b));
-	print aStr, operator, bStr, "=", resStr, "\n";
+	print aStr, operator, bStr, "=", resStr;
 	return 0;
 }
 
