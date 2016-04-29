@@ -20,10 +20,15 @@ executable interpreter
   other-modules:       AST.Types,
                        AST.Parse,
                        AST.Print
+                       AST.TypeCheck
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9,
                        parsec,
-                       pretty
+                       pretty,
+                       transformers,
+                       mtl,
+                       containers
+
   -- hs-source-dirs:      
   default-language:    Haskell2010
   ghc-options:         -Wall

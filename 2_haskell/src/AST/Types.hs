@@ -12,11 +12,11 @@ module AST.Types
 
 data Program
     = Program Stmt [Function]
-    deriving Show
+    deriving (Eq, Show)
 
 data Function
     = Function String [TypedVar] Type Stmt
-    deriving Show
+    deriving (Eq, Show)
 
 data Expr
     = EVar String
@@ -26,7 +26,7 @@ data Expr
     | EBinOp BinOp Expr Expr
     | ECall Expr [Expr]
     | ELambda [TypedVar] Type Stmt
-    deriving Show
+    deriving (Eq, Show)
 
 data BinOp
     = EMul | EDiv | EMod
@@ -35,15 +35,14 @@ data BinOp
     | EAnd
     | EOr
     | EBind 
-    deriving Show
+    deriving (Eq, Show)
 
 data Stmt
     = SList [Stmt]
     | SVar String (Maybe Type) Expr
     | SLet String (Maybe Type) Expr
     | SExpr Expr
-    | SIf Expr Stmt
-    | SIfElse Expr Stmt Stmt
+    | SIf Expr Stmt (Maybe Stmt)
     | SWhile Expr Stmt
     | SFor String Range Stmt
     | SReturn Expr
@@ -51,23 +50,23 @@ data Stmt
     | SInc String
     | SDec String
     | SPrint [Expr]
-    deriving Show
+    deriving (Eq, Show)
 
 data Range
     = RExclusive Expr Expr
     | RInclusive Expr Expr 
-    deriving Show
+    deriving (Eq, Show)
 
 data TypedVar 
     = TypedVar String Type
-    deriving Show
+    deriving (Eq, Show)
 
 data Type
     = TInt
     | TBool
     | TString
-    | TFuncType [Type] 
-    deriving Show
+    | TFunc [Type] 
+    deriving (Eq, Show)
 
 data AssignOp
     = SEq
@@ -75,4 +74,5 @@ data AssignOp
     | SSub
     | SMul
     | SDiv
-    | SMod deriving Show
+    | SMod 
+    deriving (Eq, Show)

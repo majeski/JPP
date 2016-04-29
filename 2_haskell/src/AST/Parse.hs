@@ -1,10 +1,10 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 
 module AST.Parse (parseAST) where
 
-import Control.Monad
 import Text.Parsec
 import Text.Parsec.String
 import Text.Parsec.Expr
@@ -45,8 +45,7 @@ parseAST raw = parse (whiteSpace >> program <* eof) "" raw
 program :: Parser Program
 program = do 
     main <- reserved "main:" >> blockStmt
-    functions <- optionMaybe $ many1 function
-    case functions of
+    optionMaybe (many1 function) >>= \case
         Just fs -> return $ Program main fs
         Nothing -> return $ Program main []
 
@@ -107,12 +106,12 @@ boolLiteral = choice
 callExpr :: Parser Expr
 callExpr = do
     fun <- (identifier >>= return . EVar) <|> parens expr
-    args <- optionMaybe (many1 exprList)
+    args <- optionMaybe $ many1 exprList
     return $ createCall fun args
     where
     exprList = parens $ commaSep expr
     createCall f args = case args of
-        Just l  -> foldl ECall f l
+        Just l -> foldl ECall f l
         Nothing -> f
 
 lambdaExpr :: Parser Expr
@@ -137,7 +136,7 @@ blockStmt :: Parser Stmt
 blockStmt = braces stmt
 
 stmt :: Parser Stmt
-stmt = liftM SList $ many1 singleStmt
+stmt = SList <$> many1 singleStmt
 
 singleStmt :: Parser Stmt
 singleStmt =
@@ -147,7 +146,7 @@ singleStmt =
     try flowStmt <|>
     try postfixStmt <* semi <|>
     try assignStmt <* semi <|>
-    liftM SExpr expr <* semi
+    SExpr <$> expr <* semi
 
 letStmt :: Parser Stmt 
 letStmt = do
@@ -168,7 +167,7 @@ varName = do
     return (name, t)
 
 printStmt :: Parser Stmt
-printStmt = reserved "print" >> (liftM SPrint $ expr `sepBy1` comma)
+printStmt = reserved "print" >> (SPrint <$> expr `sepBy1` comma)
 
 flowStmt :: Parser Stmt
 flowStmt = ifStmt <|> forStmt <|> whileStmt <|> (returnStmt <* semi)
@@ -177,10 +176,8 @@ ifStmt :: Parser Stmt
 ifStmt = do
     cond <- reserved "if" >> expr
     trueBlock <- blockStmt
-    falseBlockOpt <- optionMaybe (reserved "else" >> blockStmt)
-    case falseBlockOpt of
-        Just falseBlock -> return $ SIfElse cond trueBlock falseBlock
-        Nothing -> return $ SIf cond trueBlock
+    falseBlock <- optionMaybe $ reserved "else" >> blockStmt
+    return $ SIf cond trueBlock falseBlock
 
 forStmt :: Parser Stmt
 forStmt = do
@@ -214,12 +211,12 @@ returnStmt :: Parser Stmt
 returnStmt = reserved "return" >> expr >>= return . SReturn
 
 postfixStmt :: Parser Stmt
-postfixStmt = try
-    (identifier <* reservedOp "++" >>= return . SInc) <|>
+postfixStmt =
+    try (identifier <* reservedOp "++" >>= return . SInc) <|>
     (identifier <* reservedOp "--" >>= return . SDec)
 
 assignStmt :: Parser Stmt
-assignStmt = identifier >>= \var -> choice $ map (\x -> x var)
+assignStmt = identifier >>= \var -> choice $ map ($ var)
     [ assignP "=" SEq
     , assignP "+=" SAdd
     , assignP "-=" SSub
@@ -247,10 +244,10 @@ simpleType = choice
 functionType :: Parser Type
 functionType = do
     args <- functionTypeNoArgs <|> functionTypeArgs
-    return $ TFuncType args
+    return $ TFunc args
 
 functionTypeArgs :: Parser [Type]
-functionTypeArgs = functionArgType `sepBy2` (reservedOp "->")
+functionTypeArgs = functionArgType `sepBy2` reservedOp "->"
 
 functionTypeNoArgs :: Parser [Type]
 functionTypeNoArgs = do

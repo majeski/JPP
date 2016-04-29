@@ -15,7 +15,7 @@ printAST :: (Pretty a) => a -> String
 printAST x = prettyShow x
 
 nest' :: Doc -> Doc
-nest' doc = nest 4 doc 
+nest' = nest 4 
 
 instance Pretty (Program) where
     pPrint (Program code functions) = vcat $
@@ -36,11 +36,11 @@ instance Pretty (Stmt) where
     pPrint (SVar n t e) = text "var" <+> pPrint' n t <+> text "=" <+> pPrint e <> semi
     pPrint (SLet n t e) = text "let" <+> pPrint' n t <+> text "=" <+> pPrint e <> semi
     pPrint (SExpr e) = pPrint e <> semi
-    pPrint (SIf e s) = vcat $
+    pPrint (SIf e s Nothing) = vcat $
         [ text "if" <+> pPrint e <+> text " {"
         , nest' $ pPrint s
         , text "}" ]
-    pPrint (SIfElse e s1 s2) = vcat $
+    pPrint (SIf e s1 (Just s2)) = vcat $
         [ text "if" <+> pPrint e <+> text "{"
         , nest' $ pPrint s1
         , text "} else {"
@@ -61,9 +61,8 @@ instance Pretty (Stmt) where
     pPrint (SPrint l) = text "print" <+> (hcat $ punctuate (text ", ") (map pPrint l)) <> semi
 
 pPrint' :: String -> Maybe Type -> Doc
-pPrint' s t = case t of
-    Just x -> text s <> colon <+> pPrint x
-    Nothing -> text s
+pPrint' s (Just x) = text s <> colon <+> pPrint x
+pPrint' s Nothing = text s
 
 instance Pretty (Range) where
     pPrint (RExclusive a b) = pPrint a <> text "..<" <> pPrint b
@@ -112,7 +111,7 @@ instance Pretty (Type) where
     pPrint (TInt) = text "Int"
     pPrint (TBool) = text "Bool"
     pPrint (TString) = text "String"
-    pPrint (TFuncType l) = parens $
+    pPrint (TFunc l) = parens $
         if length l == 1 then
             text "Void -> " <+> (hcat $ punctuate (text " -> ") (map pPrint l))
         else
