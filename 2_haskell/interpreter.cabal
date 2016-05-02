@@ -19,8 +19,11 @@ executable interpreter
   main-is:             Main.hs
   other-modules:       AST.Types,
                        AST.Parse,
-                       AST.Print
-                       AST.TypeCheck
+                       AST.Print,
+                       Eval.Types,
+                       Eval.Builtins,
+                       Eval.TypeCheck,
+                       Eval.Runtime
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9,
                        parsec,
@@ -29,6 +32,6 @@ executable interpreter
                        mtl,
                        containers
 
-  -- hs-source-dirs:      
+  hs-source-dirs:      src      
   default-language:    Haskell2010
   ghc-options:         -Wall

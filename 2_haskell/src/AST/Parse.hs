@@ -3,7 +3,10 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 
-module AST.Parse (parseAST) where
+module AST.Parse 
+( parseAST
+, parseExpr
+) where
 
 import Text.Parsec
 import Text.Parsec.String
@@ -39,6 +42,9 @@ Token.TokenParser{..} = Token.makeTokenParser languageDef
 
 parseAST :: String -> Either ParseError Program
 parseAST raw = parse (whiteSpace >> program <* eof) "" raw
+
+parseExpr :: String -> Either ParseError Expr
+parseExpr raw = parse (whiteSpace >> expr <* eof) "" raw
 
 -- Program
 
@@ -224,8 +230,7 @@ assignStmt = identifier >>= \var -> choice $ map ($ var)
     , assignP "/=" SDiv
     , assignP "%=" SMod ]
     where
-    assignP op ctor var = 
-        reservedOp op >> expr >>= return . SAssign ctor var
+    assignP op ctor var = SAssign ctor var <$> (reservedOp op >> expr)
 
 -- Types
 

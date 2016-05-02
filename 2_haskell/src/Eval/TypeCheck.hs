@@ -1,16 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 
-module AST.TypeCheck
-( TCError
+module Eval.TypeCheck
+( TypeCheckError
 , typeCheck )
 where
 
 import Control.Monad
-import Control.Monad.Trans.Except
 import Control.Monad.State
-import Control.Monad.State.Class()
 import Control.Monad.Except
-import Control.Monad.Error.Class()
 import Data.Map ((!), Map)
 import qualified Data.Map as Map
 import Data.List
@@ -19,17 +16,19 @@ import Data.Maybe
 import AST.Types
 import AST.Print
 
-typeCheck :: Program -> Either TCError ()
+import qualified Eval.Types as EvalTypes
+import qualified Eval.Builtins as Builtins
+
+typeCheck :: Program -> Either TypeCheckError ()
 typeCheck p = runExcept $ evalStateT (programType p) (Map.empty)
 
-type TypeCheckMonad a = StateT VarSet (Except TCError) a
-
+type TCM = StateT VarSet (Except TypeCheckError)
 type VarSet = Map String VarInfo
 
 -- (readonly, type)
 type VarInfo = (Bool, Type)
 
-data TCError
+data TypeCheckError
     = TCReturnOutside
     | TCInvalidBind
     | TCNotAFunction Type
@@ -37,28 +36,28 @@ data TCError
     | TCReadonlyVar String
     | TCInvalidType Type Type
     | TCInvalidCall [Type] [Type]
-    | TCErrorIn Stmt TCError
-    | TCErrorInE Expr TCError
+    | TypeCheckErrorIn Stmt TypeCheckError
+    | TypeCheckErrorInE Expr TypeCheckError
 
-instance Show TCError where
-    show (TCReturnOutside) = "return outside of a function"
-    show (TCInvalidBind) = "cannot bind value to function without arguments"
+instance Show TypeCheckError where
+    show TCReturnOutside = "return outside of a function"
+    show TCInvalidBind = "cannot bind value to function without arguments"
     show (TCNotAFunction actual) = "not a function type: " ++ showType actual
     show (TCUndefinedVar name) = "undefined identifier '" ++ name ++ "'"
     show (TCReadonlyVar name) = "invalid operation on readonly identifier '" ++ name ++ "'"
     show (TCInvalidType expected actual) = intercalate "\n"
         [ "invalid type"
-        , "    expected: " ++ showType expected
-        , "      actual: " ++ showType actual ]
+        , "expected: " ++ showType expected
+        , "  actual: " ++ showType actual ]
     show (TCInvalidCall fargs args) = intercalate "\n"
         [ "invalid function call"
-        , "   expected arguments: " ++ intercalate ", " (map showType fargs)
-        , "     actual arguments: " ++ intercalate ", " (map showType args) ]
-    show (TCErrorIn stmt err) = concat 
+        , "expected arguments: " ++ intercalate ", " (map showType fargs)
+        , "  actual arguments: " ++ intercalate ", " (map showType args) ]
+    show (TypeCheckErrorIn stmt err) = concat 
         [ show err
         , "\nin:\n"
         , printAST stmt ]
-    show (TCErrorInE expr err) = concat
+    show (TypeCheckErrorInE expr err) = concat
         [ show err
         , "\nin:\n"
         , printAST expr ]
@@ -68,16 +67,17 @@ showType TInt = "Int"
 showType TBool = "Bool"
 showType TString = "String"
 showType (TFunc [x]) = "Void -> " ++ showType' x
-showType (TFunc l) = intercalate " -> " (map showType' l)
+showType (TFunc l) = intercalate " -> " $ map showType' l
 
 showType' :: Type -> String
 showType' x@(TFunc _) = "(" ++ showType x ++ ")"
 showType' x = showType x
 
-programType :: Program -> TypeCheckMonad ()
+-- Program
+
+programType :: Program -> TCM ()
 programType (Program main fs) = do
-    setVar "toString" (TFunc [TInt, TString]) True
-    setVar "fromString" (TFunc [TString, TInt]) True
+    mapM_ addBuiltinFunc Builtins.builtins
     mapM_ addFunc fs
     mapM_ functionType fs
     stmtType main
@@ -87,22 +87,31 @@ programType (Program main fs) = do
         where
         ts = map (\(TypedVar _ t) -> t) args ++ [retT]
 
-functionType :: Function -> TypeCheckMonad ()
-functionType (Function name args retT stmt) = do
-    st <- get
-    let argst = map (\(TypedVar _ t) -> t) args
-    modify $ Map.map (\(_, n) -> (True, n)) 
-    mapM_ (\(TypedVar n t) -> setVar n t True) args
-    setReturnType retT
-    stmtType stmt 
-    put st
+addBuiltinFunc :: EvalTypes.Builtin -> TCM ()
+addBuiltinFunc f = setVar n t True
+    where
+    n = EvalTypes.name f
+    t = EvalTypes.fType f 
+
+-- Function
+
+functionType :: Function -> TCM ()
+functionType (Function name args retT stmt) =
+    let argst = map (\(TypedVar _ t) -> t) args in do
+    localTypes $ do
+        allReadonly
+        mapM_ (\(TypedVar n t) -> setVar n t True) args
+        setReturnType retT
+        stmtType stmt 
     setVar name (TFunc $ argst ++ [retT]) True
 
-stmtType :: Stmt -> TypeCheckMonad ()
-stmtType (SList l) = forM_ l stmtType
-stmtType s = catchError (stmtType' s) (throwError . TCErrorIn s)
+-- Statements
 
-stmtType' :: Stmt -> TypeCheckMonad ()
+stmtType :: Stmt -> TCM ()
+stmtType (SList l) = forM_ l stmtType
+stmtType s = catchError (stmtType' s) (throwError . TypeCheckErrorIn s)
+
+stmtType' :: Stmt -> TCM ()
 stmtType' (SList _) = undefined
 
 stmtType' (SVar name optT e) = do
@@ -117,20 +126,16 @@ stmtType' (SLet name optT e) = do
 
 stmtType' (SExpr e) = void $ exprType e
 
-stmtType' (SIf e trueS falseS) = do
+stmtType' (SIf e trueS falseS) = localTypes $ do
     exprType e >>= expectType TBool
-    st <- get
     stmtType trueS
     when (isJust falseS) (stmtType $ fromJust falseS)
-    put st
 
-stmtType' (SWhile e stmt) = do
+stmtType' (SWhile e stmt) = localTypes $ do
     exprType e >>= expectType TBool
-    st <- get
     stmtType stmt
-    put st
 
-stmtType' (SFor n r stmt) = do
+stmtType' (SFor n r stmt) = localTypes $ do
     rangeType r
     setVar n TInt True
     stmtType stmt
@@ -143,7 +148,7 @@ stmtType' (SReturn e) = do
 
 stmtType' (SAssign _ n e) = do
     expectRWVar n
-    vT <- exprType (EVar n) 
+    vT <- exprType $ EVar n 
     exprType e >>= expectType vT
 
 stmtType' (SInc n) = do
@@ -156,14 +161,18 @@ stmtType' (SDec n) = do
 
 stmtType' (SPrint es) = mapM_ (\e -> exprType e >>= expectType TString) es 
 
-rangeType :: Range -> TypeCheckMonad ()
+-- Range
+
+rangeType :: Range -> TCM ()
 rangeType (RExclusive e1 e2) = void $ exprType e1 >> exprType e2
 rangeType (RInclusive e1 e2) = void $ exprType e1 >> exprType e2
 
-exprType :: Expr -> TypeCheckMonad Type
-exprType e = catchError (exprType' e) (throwError . TCErrorInE e)
+-- Expressions
 
-exprType' :: Expr -> TypeCheckMonad Type
+exprType :: Expr -> TCM Type
+exprType e = catchError (exprType' e) (throwError . TypeCheckErrorInE e)
+
+exprType' :: Expr -> TCM Type
 
 exprType' (EBool _) = return TBool
 exprType' (EInt _) = return TInt
@@ -208,18 +217,18 @@ exprType' (ECall f args) = do
                 return $ last fargst
         _ -> throwError $ TCNotAFunction ft
 
-exprType' (ELambda args retT stmt) = do
-    st <- get
+exprType' (ELambda args retT stmt) = localTypes $ do
     let argst = map (\(TypedVar _ t) -> t) args
     modify $ Map.map (\(_, n) -> (True, n)) 
     mapM_ (\(TypedVar n t) -> setVar n t True) args
     setReturnType retT
     stmtType stmt
-    put st
     return $ TFunc $ argst ++ [retT]
-        
+
+-- Helpers
+
 -- lhs -> rhs -> expected type for lhs & rhs
-binOpType :: Expr -> Expr -> Type -> TypeCheckMonad Type
+binOpType :: Expr -> Expr -> Type -> TCM Type
 binOpType e1 e2 t = do
     t1 <- exprType e1
     expectType t t1
@@ -227,42 +236,48 @@ binOpType e1 e2 t = do
     expectType t t2
     return t
 
-expectType :: Type -> Type -> TypeCheckMonad ()
+expectType :: Type -> Type -> TCM ()
 expectType expected actual =
     when (expected /= actual) (throwError $ TCInvalidType expected actual)
 
-expectVar :: String -> TypeCheckMonad ()
+expectVar :: String -> TCM ()
 expectVar name =
     varExist name >>= flip unless (throwError $ TCUndefinedVar name)
 
-expectRWVar :: String -> TypeCheckMonad ()
+expectRWVar :: String -> TCM ()
 expectRWVar name = do 
     expectVar name
     varReadonly name >>= flip when (throwError $ TCReadonlyVar name)
 
-returnType :: TypeCheckMonad (Maybe Type)
+returnType :: TCM (Maybe Type)
 returnType = varType returnTypeID
 
-setReturnType :: Type -> TypeCheckMonad ()
+setReturnType :: Type -> TCM ()
 setReturnType t = setVar returnTypeID t True
 
 returnTypeID :: String
 returnTypeID = "##return_type"
 
-varExist :: String -> TypeCheckMonad Bool
+varExist :: String -> TCM Bool
 varExist v = do
     st <- get
     return $ Map.member v st
 
-varReadonly :: String -> TypeCheckMonad Bool
+varReadonly :: String -> TCM Bool
 varReadonly v = do
     st <- get
     return $ fst $ st ! v 
 
-varType :: String -> TypeCheckMonad (Maybe Type)
+varType :: String -> TCM (Maybe Type)
 varType v = do
     st <- get
     return $ snd <$> Map.lookup v st
 
-setVar :: String -> Type -> Bool -> TypeCheckMonad ()
+setVar :: String -> Type -> Bool -> TCM ()
 setVar n t readonly = modify $ Map.alter (\_ -> Just (readonly, t)) n
+
+localTypes :: TCM a -> TCM a
+localTypes m = get >>= \st -> m <* put st
+
+allReadonly :: TCM ()
+allReadonly = modify $ Map.map (\(_, n) -> (True, n)) 

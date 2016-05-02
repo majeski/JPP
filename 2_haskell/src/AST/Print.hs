@@ -58,7 +58,7 @@ instance Pretty (Stmt) where
     pPrint (SAssign op v e) = text v <+> pPrint op <+> pPrint e <> semi
     pPrint (SInc v) = text v <> text "++" <> semi
     pPrint (SDec v) = text v <> text "--" <> semi
-    pPrint (SPrint l) = text "print" <+> (hcat $ punctuate (text ", ") (map pPrint l)) <> semi
+    pPrint (SPrint l) = text "print" <+> (hcat $ punctuate (text ", ") $ map pPrint l) <> semi
 
 pPrint' :: String -> Maybe Type -> Doc
 pPrint' s (Just x) = text s <> colon <+> pPrint x
@@ -69,12 +69,12 @@ instance Pretty (Range) where
     pPrint (RInclusive a b) = pPrint a <> text "..." <> pPrint b
 
 instance Pretty (AssignOp) where
-    pPrint (SEq) = text "="
-    pPrint (SAdd) = text "+="
-    pPrint (SSub) = text "-="
-    pPrint (SMul) = text "*="
-    pPrint (SDiv) = text "/="
-    pPrint (SMod) = text "%="
+    pPrint SEq = text "="
+    pPrint SAdd = text "+="
+    pPrint SSub = text "-="
+    pPrint SMul = text "*="
+    pPrint SDiv = text "/="
+    pPrint SMod = text "%="
 
 instance Pretty (TypedVar) where
     pPrint (TypedVar n t) = text n <> colon <+> pPrint t
@@ -88,34 +88,34 @@ instance Pretty (Expr) where
     pPrint (ECall f args) = pPrint f <> printFunArgs args
     pPrint (ELambda args retT code) = vcat $
         [text "lambda" <+> printFunArgs args <+> text "->" <+> pPrint retT <+> text "{"
-        , nest' (pPrint code)
+        , nest' $ pPrint code
         , text "}" ]
 
 instance Pretty (BinOp) where
-    pPrint (EMul) = text "*"
-    pPrint (EDiv) = text "/"
-    pPrint (EMod) = text "%"
-    pPrint (EAdd) = text "+"
-    pPrint (ESub) = text "-"
-    pPrint (ELess) = text "<"
-    pPrint (ELessE) = text "<="
-    pPrint (EGreater) = text ">"
-    pPrint (EGreaterE) = text ">="
-    pPrint (EEq) = text "=="
-    pPrint (ENeq) = text "!="
-    pPrint (EAnd) = text "&&"
-    pPrint (EOr) = text "||"
-    pPrint (EBind) = text "::"
+    pPrint EMul = text "*"
+    pPrint EDiv = text "/"
+    pPrint EMod = text "%"
+    pPrint EAdd = text "+"
+    pPrint ESub = text "-"
+    pPrint ELess = text "<"
+    pPrint ELessE = text "<="
+    pPrint EGreater = text ">"
+    pPrint EGreaterE = text ">="
+    pPrint EEq = text "=="
+    pPrint ENeq = text "!="
+    pPrint EAnd = text "&&"
+    pPrint EOr = text "||"
+    pPrint EBind = text "::"
 
 instance Pretty (Type) where
-    pPrint (TInt) = text "Int"
-    pPrint (TBool) = text "Bool"
-    pPrint (TString) = text "String"
+    pPrint TInt = text "Int"
+    pPrint TBool = text "Bool"
+    pPrint TString = text "String"
     pPrint (TFunc l) = parens $
         if length l == 1 then
-            text "Void -> " <+> (hcat $ punctuate (text " -> ") (map pPrint l))
+            text "Void -> " <+> (hcat $ punctuate (text " -> ") $ map pPrint l)
         else
             hcat $ punctuate (text " -> ") (map pPrint l)
 
 printFunArgs :: Pretty a => [a] -> Doc
-printFunArgs args = parens $ hcat $ punctuate (text ", ") (map pPrint args)
+printFunArgs args = parens $ hcat $ punctuate (text ", ") $ map pPrint args
