@@ -51,14 +51,6 @@ initialEnv = Env Map.empty Nothing
 registerBuiltin :: EvalTypes.Builtin -> IM ()
 registerBuiltin b = setVal (EvalTypes.name b) $ VFunction [] (FIBuiltin b)
 
-registerFunctionName :: Function -> IM ()
-registerFunctionName (Function name _ _ _) = setVal name $ VNone
-
-fixFunctionImpl :: Function -> IM ()
-fixFunctionImpl (Function name args _ stmt) = do
-    Env mem _ <- get
-    updateVal name $ VFunction [] $ FIUser (map argName args) stmt mem              
-
 -- Statements
 
 evalStmt :: Stmt -> IM ()
@@ -67,6 +59,10 @@ evalStmt (SList l) = mapM_ evalStmt l
 
 evalStmt (SVar n _ e) = evalExpr e >>= setVal n
 evalStmt (SLet n _ e) = evalExpr e >>= setVal n
+
+evalStmt (SFunction f) = do
+    registerFunctionName f
+    fixFunctionImpl f
 
 evalStmt (SExpr e) = void $ evalExpr e
 
@@ -202,8 +198,13 @@ binOpBB _ _ _ = undefined
 
 -- Helpers
 
-argName :: TypedVar -> String
-argName (TypedVar n _) = n
+registerFunctionName :: Function -> IM ()
+registerFunctionName (Function name _ _ _) = setVal name $ VNone
+
+fixFunctionImpl :: Function -> IM ()
+fixFunctionImpl (Function name args _ stmt) = do
+    Env mem _ <- get
+    updateVal name $ VFunction [] $ FIUser (map argName args) stmt mem
 
 localEval :: IM a -> IM a
 localEval m = get >>= \st -> m <* put st

@@ -79,31 +79,8 @@ programType :: Program -> TCM ()
 programType (Program main fs) = do
     mapM_ addBuiltinFunc Builtins.builtins
     mapM_ addFunc fs
-    mapM_ functionType fs
+    mapM_ (\(Function _ args retT s) -> functionImplType args retT s) fs
     stmtType main
-    where
-    addFunc (Function name args retT _) = 
-        setVar name (TFunc ts) True
-        where
-        ts = map (\(TypedVar _ t) -> t) args ++ [retT]
-
-addBuiltinFunc :: EvalTypes.Builtin -> TCM ()
-addBuiltinFunc f = setVar n t True
-    where
-    n = EvalTypes.name f
-    t = EvalTypes.fType f 
-
--- Function
-
-functionType :: Function -> TCM ()
-functionType (Function name args retT stmt) =
-    let argst = map (\(TypedVar _ t) -> t) args in do
-    localTypes $ do
-        allReadonly
-        mapM_ (\(TypedVar n t) -> setVar n t True) args
-        setReturnType retT
-        stmtType stmt 
-    setVar name (TFunc $ argst ++ [retT]) True
 
 -- Statements
 
@@ -123,6 +100,10 @@ stmtType' (SLet name optT e) = do
     eT <- exprType e
     when (isJust optT) (expectType (fromJust optT) eT)
     setVar name eT True
+
+stmtType' (SFunction f@(Function _ args retT stmt)) = do
+    addFunc f
+    functionImplType args retT stmt
 
 stmtType' (SExpr e) = void $ exprType e
 
@@ -217,13 +198,18 @@ exprType' (ECall f args) = do
                 return $ last fargst
         _ -> throwError $ TCNotAFunction ft
 
-exprType' (ELambda args retT stmt) = localTypes $ do
-    let argst = map (\(TypedVar _ t) -> t) args
-    modify $ Map.map (\(_, n) -> (True, n)) 
+exprType' (ELambda args retT stmt) = do
+    functionImplType args retT stmt
+    return $ TFunc $ map argType args ++ [retT]
+
+-- Function impl
+
+functionImplType :: [TypedVar] -> Type -> Stmt -> TCM ()
+functionImplType args retT stmt = localTypes $ do
+    allReadonly
     mapM_ (\(TypedVar n t) -> setVar n t True) args
     setReturnType retT
     stmtType stmt
-    return $ TFunc $ argst ++ [retT]
 
 -- Helpers
 
@@ -235,6 +221,17 @@ binOpType e1 e2 t = do
     t2 <- exprType e2
     expectType t t2
     return t
+
+addFunc :: Function -> TCM ()
+addFunc (Function name args retT _) = setVar name t True
+    where
+    t = TFunc $ map argType args ++ [retT]
+
+addBuiltinFunc :: EvalTypes.Builtin -> TCM ()
+addBuiltinFunc f = setVar n t True
+    where
+    n = EvalTypes.name f
+    t = EvalTypes.fType f 
 
 expectType :: Type -> Type -> TCM ()
 expectType expected actual =

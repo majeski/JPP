@@ -148,6 +148,7 @@ singleStmt :: Parser Stmt
 singleStmt =
     try letStmt <* semi <|> 
     try varStmt <* semi <|> 
+    try funcStmt <|>
     try printStmt <* semi <|> 
     try flowStmt <|>
     try postfixStmt <* semi <|>
@@ -171,6 +172,9 @@ varName = do
     name <- identifier
     t <- optionMaybe $ colon >> typeLiteral
     return (name, t)
+
+funcStmt :: Parser Stmt
+funcStmt = SFunction <$> function
 
 printStmt :: Parser Stmt
 printStmt = reserved "print" >> (SPrint <$> expr `sepBy1` comma)

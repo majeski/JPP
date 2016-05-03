@@ -41,6 +41,7 @@ data Stmt
     = SList [Stmt]
     | SVar String (Maybe Type) Expr
     | SLet String (Maybe Type) Expr
+    | SFunction Function
     | SExpr Expr
     | SIf Expr Stmt (Maybe Stmt)
     | SWhile Expr Stmt
@@ -57,9 +58,10 @@ data Range
     | RInclusive Expr Expr 
     deriving (Eq, Show)
 
-data TypedVar 
-    = TypedVar String Type
-    deriving (Eq, Show)
+data TypedVar = TypedVar {
+    argName :: String,
+    argType :: Type
+} deriving (Eq, Show)
 
 data Type
     = TInt

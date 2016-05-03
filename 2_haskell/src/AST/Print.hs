@@ -35,6 +35,7 @@ instance Pretty (Stmt) where
     pPrint (SList l) = vcat $ map pPrint l
     pPrint (SVar n t e) = text "var" <+> pPrint' n t <+> text "=" <+> pPrint e <> semi
     pPrint (SLet n t e) = text "let" <+> pPrint' n t <+> text "=" <+> pPrint e <> semi
+    pPrint (SFunction f) = pPrint f
     pPrint (SExpr e) = pPrint e <> semi
     pPrint (SIf e s Nothing) = vcat $
         [ text "if" <+> pPrint e <+> text " {"

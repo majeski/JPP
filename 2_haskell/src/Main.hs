@@ -11,7 +11,7 @@ import Eval.Runtime
 
 main :: IO ()
 main = do
-    filename <- liftM head getArgs
+    filename <- head <$> getArgs
     withFile filename ReadMode interpreter
 
 interpreter :: Handle -> IO ()
