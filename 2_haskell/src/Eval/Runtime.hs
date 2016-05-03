@@ -60,6 +60,9 @@ evalStmt (SList l) = mapM_ evalStmt l
 evalStmt (SVar n _ e) = evalExpr e >>= setVal n
 evalStmt (SLet n _ e) = evalExpr e >>= setVal n
 
+evalStmt (SLetTuple tup _ e) = evalExpr e >>= setTuple tup
+evalStmt (SVarTuple tup _ e) = evalExpr e >>= setTuple tup
+
 evalStmt (SFunction f) = do
     registerFunctionName f
     fixFunctionImpl f
@@ -107,6 +110,8 @@ evalStmt (SAssign op n e) = do
             updateIntVal n (flip mod v)
         _ -> undefined
 
+evalStmt (STupleAssign tup e) = evalExpr e >>= updateTupleVal tup
+
 evalStmt (SInc n) = updateIntVal n succ
 evalStmt (SDec n) = updateIntVal n pred
 
@@ -134,6 +139,7 @@ evalExpr (EVar n) = getVal n
 evalExpr (EBool x) = return $ VBool x
 evalExpr (EString x) = return $ VString x
 evalExpr (EInt x) = return $ VInt x
+evalExpr (ETuple es) = VTuple <$> mapM evalExpr es
 evalExpr (EBinOp op e1 e2) = evalBinOp op e1 e2
 evalExpr (ELambda args _ stmt) = do
     Env mem _ <- get
@@ -215,10 +221,26 @@ getVal name = do
     v <- liftIO $ readIORef $ mem ! name
     return v
 
+setTuple :: Tuple -> Value -> IM ()
+setTuple (Tuple terms) (VTuple vs) = mapM_ (uncurry setTupleTerm) $ zip terms vs
+setTuple _ _ = undefined
+
+setTupleTerm :: TupleTerm -> Value -> IM ()
+setTupleTerm (TupleTermTuple tup) = setTuple tup
+setTupleTerm (TupleTermVar v) = setVal v
+
 setVal :: String -> Value -> IM ()
 setVal n v = do
     vRef <- liftIO $ newIORef v
     modify $ \(Env mem c) -> Env ((Map.alter (\_ -> Just vRef) n) mem) c
+
+updateTupleVal :: Tuple -> Value -> IM ()
+updateTupleVal (Tuple terms) (VTuple vs) = mapM_ (uncurry updateTupleTermVal) $ zip terms vs
+updateTupleVal _ _ = undefined
+
+updateTupleTermVal :: TupleTerm -> Value -> IM ()
+updateTupleTermVal (TupleTermTuple tup) = updateTupleVal tup
+updateTupleTermVal (TupleTermVar v) = updateVal v
 
 updateVal :: String -> Value -> IM ()
 updateVal n v = do

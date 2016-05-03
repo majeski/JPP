@@ -5,7 +5,7 @@ module Eval.Types
 , Memory
 ) where
 
-import Data.Map
+import Data.Map (Map)
 import Data.IORef
 
 import AST.Types
@@ -14,6 +14,7 @@ data Value
     = VInt Integer
     | VBool Bool
     | VString String
+    | VTuple [Value]
     | VFunction [Value] FunctionImpl
     | VNone
 

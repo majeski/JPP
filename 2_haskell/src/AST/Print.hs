@@ -5,7 +5,6 @@ module AST.Print
 , Pretty (..)
 ) where
 
-
 import AST.Types
 
 import Text.PrettyPrint
@@ -26,15 +25,20 @@ instance Pretty (Program) where
         
 instance Pretty (Function) where
     pPrint (Function name args retT code) = vcat $
-        [ text "func" <+> text name <> printFunArgs args <+> text "->" <+> pPrint retT <+> text "{"
+        [ text "func" <+> text name <> 
+            hsep [parens $ commaSep args, text "->", pPrint retT, text "{"]
         , nest' $ pPrint code
         , text "}"
         , text "" ]
 
 instance Pretty (Stmt) where
     pPrint (SList l) = vcat $ map pPrint l
-    pPrint (SVar n t e) = text "var" <+> pPrint' n t <+> text "=" <+> pPrint e <> semi
-    pPrint (SLet n t e) = text "let" <+> pPrint' n t <+> text "=" <+> pPrint e <> semi
+    pPrint (SVar n t e) = text "var" <+> text n <> pPrint' t <+> text "=" <+> pPrint e <> semi
+    pPrint (SLet n t e) = text "let" <+> text n <> pPrint' t <+> text "=" <+> pPrint e <> semi
+    pPrint (SVarTuple tp t e) = 
+        text "var" <+> pPrint tp <> pPrint' t <+> text "=" <+> pPrint e <> semi
+    pPrint (SLetTuple tp t e) =
+        text "let" <+> pPrint tp <> pPrint' t <+> text "=" <+> pPrint e <> semi
     pPrint (SFunction f) = pPrint f
     pPrint (SExpr e) = pPrint e <> semi
     pPrint (SIf e s Nothing) = vcat $
@@ -57,13 +61,21 @@ instance Pretty (Stmt) where
         , text "}" ]
     pPrint (SReturn e) = text "return" <+> pPrint e <> semi
     pPrint (SAssign op v e) = text v <+> pPrint op <+> pPrint e <> semi
+    pPrint (STupleAssign t e) = pPrint t <+> text "=" <+> pPrint e <> semi
     pPrint (SInc v) = text v <> text "++" <> semi
     pPrint (SDec v) = text v <> text "--" <> semi
-    pPrint (SPrint l) = text "print" <+> (hcat $ punctuate (text ", ") $ map pPrint l) <> semi
+    pPrint (SPrint l) = text "print" <+> commaSep l <> semi
 
-pPrint' :: String -> Maybe Type -> Doc
-pPrint' s (Just x) = text s <> colon <+> pPrint x
-pPrint' s Nothing = text s
+pPrint' :: Maybe Type -> Doc
+pPrint' (Just x) = colon <+> pPrint x
+pPrint' Nothing = empty
+
+instance Pretty (Tuple) where
+    pPrint (Tuple terms) = parens $ commaSep terms
+
+instance Pretty (TupleTerm) where
+    pPrint (TupleTermTuple t) = pPrint t
+    pPrint (TupleTermVar v) = text v
 
 instance Pretty (Range) where
     pPrint (RExclusive a b) = pPrint a <> text "..<" <> pPrint b
@@ -85,10 +97,11 @@ instance Pretty (Expr) where
     pPrint (EInt x) = text $ show x 
     pPrint (EString x) = doubleQuotes $ text x
     pPrint (EBool x) = if x then text "true" else text "false"
+    pPrint (ETuple xs) = parens $ commaSep xs
     pPrint (EBinOp op a b) = parens $ pPrint a <+> pPrint op <+> pPrint b
-    pPrint (ECall f args) = pPrint f <> printFunArgs args
+    pPrint (ECall f args) = pPrint f <> parens (commaSep args)
     pPrint (ELambda args retT code) = vcat $
-        [text "lambda" <+> printFunArgs args <+> text "->" <+> pPrint retT <+> text "{"
+        [ hsep [text "lambda", commaSep args, text "->", pPrint retT, text "{"]
         , nest' $ pPrint code
         , text "}" ]
 
@@ -112,11 +125,16 @@ instance Pretty (Type) where
     pPrint TInt = text "Int"
     pPrint TBool = text "Bool"
     pPrint TString = text "String"
+    pPrint (TTuple l) = parens $ commaSep l 
     pPrint (TFunc l) = parens $
         if length l == 1 then
             text "Void -> " <+> (hcat $ punctuate (text " -> ") $ map pPrint l)
         else
             hcat $ punctuate (text " -> ") (map pPrint l)
 
-printFunArgs :: Pretty a => [a] -> Doc
-printFunArgs args = parens $ hcat $ punctuate (text ", ") $ map pPrint args
+instance Pretty (TypeSkeleton) where
+    pPrint TSTerm = text "?"
+    pPrint (TSTuple l) = parens $ commaSep l
+
+commaSep :: Pretty a => [a] -> Doc
+commaSep args = hsep $ punctuate comma $ map pPrint args

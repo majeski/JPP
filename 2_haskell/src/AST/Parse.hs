@@ -73,6 +73,7 @@ term = choice
     [ natural >>= return . EInt
     , stringLiteral >>= return . EString
     , boolLiteral >>= return . EBool
+    , try tupleExpr
     , callExpr
     , lambdaExpr ]
 table = map map' [binOps1, binOps2, binOps3, binOps4, binOps5, binOps6]
@@ -109,6 +110,9 @@ boolLiteral = choice
     [ reserved "true" >> return True
     , reserved "false" >> return False ]
 
+tupleExpr :: Parser Expr
+tupleExpr = ETuple <$> (parens $ expr `sepBy2` comma)
+
 callExpr :: Parser Expr
 callExpr = do
     fun <- (identifier >>= return . EVar) <|> parens expr
@@ -142,36 +146,52 @@ blockStmt :: Parser Stmt
 blockStmt = braces stmt
 
 stmt :: Parser Stmt
-stmt = SList <$> many1 singleStmt
+stmt = SList <$> many singleStmt
 
 singleStmt :: Parser Stmt
-singleStmt =
-    try letStmt <* semi <|> 
-    try varStmt <* semi <|> 
-    try funcStmt <|>
-    try printStmt <* semi <|> 
-    try flowStmt <|>
-    try postfixStmt <* semi <|>
-    try assignStmt <* semi <|>
-    SExpr <$> expr <* semi
+singleStmt = choice
+    [ try letStmt <* semi 
+    , try varStmt <* semi 
+    , try letTupleStmt <* semi
+    , try varTupleStmt <* semi
+    , try funcStmt
+    , try printStmt <* semi 
+    , try flowStmt
+    , try postfixStmt <* semi
+    , try assignStmt <* semi
+    , try tupleAssignStmt <* semi
+    , SExpr <$> expr <* semi ]
 
 letStmt :: Parser Stmt 
 letStmt = do
-    (name, t) <- reserved "let" >> varName
+    name <- reserved "let" >> identifier
+    t <- varSygnature
     valExpr <- reservedOp "=" >> expr
     return $ SLet name t valExpr
 
 varStmt :: Parser Stmt 
 varStmt = do
-    (name, t) <- reserved "var" >> varName
+    name <- reserved "var" >> identifier
+    t <- varSygnature 
     valExpr <- reservedOp "=" >> expr
     return $ SVar name t valExpr
 
-varName :: Parser (String, Maybe Type)
-varName = do
-    name <- identifier
-    t <- optionMaybe $ colon >> typeLiteral
-    return (name, t)
+letTupleStmt :: Parser Stmt
+letTupleStmt = do
+    tp <- reserved "let" >> tuple
+    t <- varSygnature
+    valExpr <- reservedOp "=" >> expr
+    return $ SLetTuple tp t valExpr
+
+varTupleStmt :: Parser Stmt
+varTupleStmt = do
+    tp <- reserved "var" >> tuple
+    t <- varSygnature
+    valExpr <- reservedOp "=" >> expr
+    return $ SVarTuple tp t valExpr
+
+varSygnature :: Parser (Maybe Type)
+varSygnature = optionMaybe $ colon >> typeLiteral
 
 funcStmt :: Parser Stmt
 funcStmt = SFunction <$> function
@@ -195,21 +215,6 @@ forStmt = do
     r <- reserved "in" >> range
     block <- blockStmt
     return $ SFor var r block
-
-range :: Parser Range
-range = try inRange <|> exRange
-
-inRange :: Parser Range
-inRange = do
-    begin <- expr <* reservedOp "..."
-    end <- expr
-    return $ RInclusive begin end
-
-exRange :: Parser Range
-exRange = do
-    begin <- expr <* reservedOp "..<"
-    end <- expr
-    return $ RExclusive begin end
 
 whileStmt :: Parser Stmt
 whileStmt = do
@@ -236,13 +241,52 @@ assignStmt = identifier >>= \var -> choice $ map ($ var)
     where
     assignP op ctor var = SAssign ctor var <$> (reservedOp op >> expr)
 
+tupleAssignStmt :: Parser Stmt
+tupleAssignStmt = do
+    tp <- tuple <* reservedOp "="
+    e <- expr
+    return $ STupleAssign tp e
+
+-- Tuple 
+
+tuple :: Parser Tuple
+tuple = Tuple <$> (parens $ tupleTerm `sepBy2` comma)
+
+tupleTerm :: Parser TupleTerm
+tupleTerm = 
+    (TupleTermVar <$> identifier) <|>
+    (TupleTermTuple <$> tuple)
+
+-- Range
+
+range :: Parser Range
+range = try inRange <|> exRange
+
+inRange :: Parser Range
+inRange = do
+    begin <- expr <* reservedOp "..."
+    end <- expr
+    return $ RInclusive begin end
+
+exRange :: Parser Range
+exRange = do
+    begin <- expr <* reservedOp "..<"
+    end <- expr
+    return $ RExclusive begin end
+
 -- Types
 
 typeLiteral :: Parser Type
-typeLiteral = try functionType <|> simpleType
+typeLiteral = 
+    try functionType <|>
+    tupleType <|> 
+    simpleType
 
 functionArgType :: Parser Type
-functionArgType = simpleType <|> parens functionType
+functionArgType = 
+    simpleType <|> 
+    try (parens functionType) <|>
+    tupleType
 
 simpleType :: Parser Type
 simpleType = choice 
@@ -251,9 +295,7 @@ simpleType = choice
     , reserved "String" >> return TString ]
 
 functionType :: Parser Type
-functionType = do
-    args <- functionTypeNoArgs <|> functionTypeArgs
-    return $ TFunc args
+functionType = TFunc <$> (functionTypeNoArgs <|> functionTypeArgs)
 
 functionTypeArgs :: Parser [Type]
 functionTypeArgs = functionArgType `sepBy2` reservedOp "->"
@@ -262,6 +304,9 @@ functionTypeNoArgs :: Parser [Type]
 functionTypeNoArgs = do
     retT <- reserved "Void" >> reservedOp "->" >> functionArgType
     return [retT]
+
+tupleType :: Parser Type
+tupleType = TTuple <$> (parens $ typeLiteral `sepBy2` comma)
 
 -- Helpers
 

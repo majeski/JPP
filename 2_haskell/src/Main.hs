@@ -19,7 +19,7 @@ interpreter handle = do
     content <- hGetContents handle
     let result = parse content >>= checkTypes
     case result of
-        Left err -> putStrLn $ "ERR:\n" ++ err
+        Left err -> hPutStrLn stderr $ "ERR:\n" ++ err
         Right p -> run p
 
 parse :: String -> Either String Program
@@ -34,5 +34,5 @@ checkTypes p = case typeCheck p of
 
 run :: Program -> IO ()
 run p = void $ evalProgram p >>= \case
-    Left err -> putStrLn $ "Runtime error: " ++ show err
+    Left err -> hPutStrLn stderr $ "Runtime error: " ++ show err
     Right _ -> return ()

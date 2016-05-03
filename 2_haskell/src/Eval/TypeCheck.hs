@@ -36,6 +36,7 @@ data TypeCheckError
     | TCReadonlyVar String
     | TCInvalidType Type Type
     | TCInvalidCall [Type] [Type]
+    | TCInvalidMatch TypeSkeleton Type
     | TypeCheckErrorIn Stmt TypeCheckError
     | TypeCheckErrorInE Expr TypeCheckError
 
@@ -53,6 +54,10 @@ instance Show TypeCheckError where
         [ "invalid function call"
         , "expected arguments: " ++ intercalate ", " (map showType fargs)
         , "  actual arguments: " ++ intercalate ", " (map showType args) ]
+    show (TCInvalidMatch ts t) = intercalate "\n"
+        [ "invalid match"
+        , "   expected: " ++ printAST ts
+        , "     actual: " ++ printAST t ]
     show (TypeCheckErrorIn stmt err) = concat 
         [ show err
         , "\nin:\n"
@@ -63,11 +68,9 @@ instance Show TypeCheckError where
         , printAST expr ]
 
 showType :: Type -> String
-showType TInt = "Int"
-showType TBool = "Bool"
-showType TString = "String"
 showType (TFunc [x]) = "Void -> " ++ showType' x
 showType (TFunc l) = intercalate " -> " $ map showType' l
+showType t = printAST t
 
 showType' :: Type -> String
 showType' x@(TFunc _) = "(" ++ showType x ++ ")"
@@ -93,13 +96,27 @@ stmtType' (SList _) = undefined
 
 stmtType' (SVar name optT e) = do
     eT <- exprType e
-    when (isJust optT) (expectType (fromJust optT) eT)
+    expectOptType eT optT
     setVar name eT False
 
 stmtType' (SLet name optT e) = do
     eT <- exprType e
-    when (isJust optT) (expectType (fromJust optT) eT)
+    expectOptType eT optT
     setVar name eT True
+
+stmtType' (SVarTuple tup optT e) = do
+    eT <- exprType e
+    expectOptType eT optT
+    tSkeleton <- tupleTypeSkeleton tup
+    expectMatch tSkeleton eT
+    setTuple tup eT False
+
+stmtType' (SLetTuple tup optT e) = do
+    eT <- exprType e
+    expectOptType eT optT
+    tSkeleton <- tupleTypeSkeleton tup
+    expectMatch tSkeleton eT
+    setTuple tup eT True
 
 stmtType' (SFunction f@(Function _ args retT stmt)) = do
     addFunc f
@@ -129,8 +146,13 @@ stmtType' (SReturn e) = do
 
 stmtType' (SAssign _ n e) = do
     expectRWVar n
-    vT <- exprType $ EVar n 
+    vT <- fromJust <$> varType n
     exprType e >>= expectType vT
+
+stmtType' (STupleAssign t e) = do
+    expectRWTuple t
+    tupT <- tupleType t
+    exprType e >>= expectType tupT
 
 stmtType' (SInc n) = do
     expectRWVar n
@@ -162,6 +184,8 @@ exprType' (EString _) = return TString
 exprType' (EVar name) = do
     expectVar name
     fromJust <$> varType name
+
+exprType' (ETuple es) = TTuple <$> mapM exprType es
 
 exprType' (EBinOp EMul e1 e2) = binOpType e1 e2 TInt 
 exprType' (EBinOp EDiv e1 e2) = binOpType e1 e2 TInt
@@ -211,6 +235,22 @@ functionImplType args retT stmt = localTypes $ do
     setReturnType retT
     stmtType stmt
 
+-- Tuple
+
+tupleType :: Tuple -> TCM Type
+tupleType (Tuple terms) = TTuple <$> mapM tupleTermType terms
+
+tupleTermType :: TupleTerm -> TCM Type
+tupleTermType (TupleTermTuple tp) = tupleType tp
+tupleTermType (TupleTermVar v) = fromJust <$> (expectVar v >> varType v)
+    
+tupleTypeSkeleton :: Tuple -> TCM TypeSkeleton
+tupleTypeSkeleton (Tuple terms) = TSTuple <$> (mapM tupleTermTypeSkeleton terms)
+
+tupleTermTypeSkeleton :: TupleTerm -> TCM TypeSkeleton
+tupleTermTypeSkeleton (TupleTermTuple tp) = tupleTypeSkeleton tp
+tupleTermTypeSkeleton (TupleTermVar _) = return TSTerm
+
 -- Helpers
 
 -- lhs -> rhs -> expected type for lhs & rhs
@@ -233,6 +273,20 @@ addBuiltinFunc f = setVar n t True
     n = EvalTypes.name f
     t = EvalTypes.fType f 
 
+expectMatch :: TypeSkeleton -> Type -> TCM ()
+expectMatch ts t = expectMatch' ts t ts t
+
+expectMatch' :: TypeSkeleton -> Type -> TypeSkeleton -> Type -> TCM ()
+expectMatch' outerTs outerT (TSTuple terms) (TTuple t) = do
+    when (length terms /= length t) (throwError $ TCInvalidMatch outerTs outerT)
+    mapM_ (uncurry $ expectMatch' outerTs outerT) (zip terms t)
+expectMatch' _ _ TSTerm _ = return ()
+expectMatch' _ _ _ _ = undefined
+
+expectOptType :: Type -> Maybe Type -> TCM ()
+expectOptType _ Nothing = return ()
+expectOptType expected (Just t) = expectType expected t
+
 expectType :: Type -> Type -> TCM ()
 expectType expected actual =
     when (expected /= actual) (throwError $ TCInvalidType expected actual)
@@ -245,6 +299,13 @@ expectRWVar :: String -> TCM ()
 expectRWVar name = do 
     expectVar name
     varReadonly name >>= flip when (throwError $ TCReadonlyVar name)
+
+expectRWTuple :: Tuple -> TCM ()
+expectRWTuple (Tuple terms) = mapM_ expectRWTupleTerm terms
+    
+expectRWTupleTerm :: TupleTerm -> TCM ()
+expectRWTupleTerm (TupleTermTuple t) = expectRWTuple t
+expectRWTupleTerm (TupleTermVar v) = expectRWVar v
 
 returnType :: TCM (Maybe Type)
 returnType = varType returnTypeID
@@ -269,6 +330,15 @@ varType :: String -> TCM (Maybe Type)
 varType v = do
     st <- get
     return $ snd <$> Map.lookup v st
+
+setTuple :: Tuple -> Type -> Bool -> TCM ()
+setTuple (Tuple terms) (TTuple ts) readonly = 
+    mapM_ (\(term, t) -> setTupleTerm term t readonly) $ zip terms ts
+setTuple _ _ _ = undefined
+
+setTupleTerm :: TupleTerm -> Type -> Bool -> TCM  ()
+setTupleTerm (TupleTermVar v) = setVar v
+setTupleTerm (TupleTermTuple tup) = setTuple tup
 
 setVar :: String -> Type -> Bool -> TCM ()
 setVar n t readonly = modify $ Map.alter (\_ -> Just (readonly, t)) n

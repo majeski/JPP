@@ -4,9 +4,12 @@ module AST.Types
 , Expr (..)
 , BinOp (..)
 , Stmt (..)
+, Tuple (..)
+, TupleTerm (..)
 , Range (..)
 , TypedVar (..)
 , Type (..)
+, TypeSkeleton (..)
 , AssignOp (..)
 ) where
 
@@ -23,6 +26,7 @@ data Expr
     | EBool Bool
     | EString String
     | EInt Integer
+    | ETuple [Expr]
     | EBinOp BinOp Expr Expr
     | ECall Expr [Expr]
     | ELambda [TypedVar] Type Stmt
@@ -41,6 +45,8 @@ data Stmt
     = SList [Stmt]
     | SVar String (Maybe Type) Expr
     | SLet String (Maybe Type) Expr
+    | SVarTuple Tuple (Maybe Type) Expr
+    | SLetTuple Tuple (Maybe Type) Expr
     | SFunction Function
     | SExpr Expr
     | SIf Expr Stmt (Maybe Stmt)
@@ -48,9 +54,19 @@ data Stmt
     | SFor String Range Stmt
     | SReturn Expr
     | SAssign AssignOp String Expr
+    | STupleAssign Tuple Expr
     | SInc String
     | SDec String
     | SPrint [Expr]
+    deriving (Eq, Show)
+
+data Tuple
+    = Tuple [TupleTerm]
+    deriving (Eq, Show)
+
+data TupleTerm
+    = TupleTermTuple Tuple
+    | TupleTermVar String
     deriving (Eq, Show)
 
 data Range
@@ -67,7 +83,13 @@ data Type
     = TInt
     | TBool
     | TString
+    | TTuple [Type]
     | TFunc [Type] 
+    deriving (Eq, Show)
+
+data TypeSkeleton
+    = TSTuple [TypeSkeleton]
+    | TSTerm
     deriving (Eq, Show)
 
 data AssignOp
