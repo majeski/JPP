@@ -23,9 +23,9 @@ data FunctionImpl
     | FIUser [String] Stmt Memory
 
 data Builtin = Builtin {
-    name :: String,
-    fType :: Type,
-    assocF :: [Value] -> Value
+    builtinName :: String,
+    builtinType :: Type,
+    builtinFunc :: [Value] -> Value
 }
 
 type Memory = Map String (IORef Value)

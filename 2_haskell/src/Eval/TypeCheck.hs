@@ -11,22 +11,22 @@ import Control.Monad.Except
 import Data.Map ((!), Map)
 import qualified Data.Map as Map
 import Data.List
-import Data.Maybe
 
 import AST.Types
 import AST.Print
 
-import qualified Eval.Types as EvalTypes
+import Eval.Types
 import qualified Eval.Builtins as Builtins
 
 typeCheck :: Program -> Either TypeCheckError ()
-typeCheck p = runExcept $ evalStateT (programType p) (Map.empty)
+typeCheck p = runExcept $ evalStateT (programType p) Map.empty
 
 type TCM = StateT VarSet (Except TypeCheckError)
 type VarSet = Map String VarInfo
 
--- ((readonly, outer_scope), type)
-type VarInfo = ((Bool, Bool), Type)
+type VarInfo = ((Access, Scope), Type)
+data Scope = OuterScope | CurrentScope
+data Access = Readonly | ReadWrite
 
 data TypeCheckError
     = TCReturnOutside
@@ -59,7 +59,7 @@ instance Show TypeCheckError where
     show (TCInvalidMatch ts t) = intercalate "\n"
         [ "invalid match"
         , "   expected: " ++ printAST ts
-        , "     actual: " ++ printAST t ]
+        , "     actual: " ++ showType t ]
     show (TypeCheckErrorIn stmt err) = concat 
         [ show err
         , "\nin:\n"
@@ -95,31 +95,12 @@ stmtType (SList l) = forM_ l stmtType
 stmtType s = catchError (stmtType' s) (throwError . TypeCheckErrorIn s)
 
 stmtType' :: Stmt -> TCM ()
-stmtType' (SList _) = undefined
+stmtType' (SList _) = error "invalid stmtType' usage"
 
-stmtType' (SVar name optT e) = do
-    eT <- exprType e
-    expectOptType eT optT
-    setVar name eT False
-
-stmtType' (SLet name optT e) = do
-    eT <- exprType e
-    expectOptType eT optT
-    setVar name eT True
-
-stmtType' (SVarTuple tup optT e) = do
-    eT <- exprType e
-    expectOptType eT optT
-    tSkeleton <- tupleTypeSkeleton tup
-    expectMatch tSkeleton eT
-    setTuple tup eT False
-
-stmtType' (SLetTuple tup optT e) = do
-    eT <- exprType e
-    expectOptType eT optT
-    tSkeleton <- tupleTypeSkeleton tup
-    expectMatch tSkeleton eT
-    setTuple tup eT True
+stmtType' (SVar name optT e) = declareVar name optT e ReadWrite
+stmtType' (SLet name optT e) = declareVar name optT e Readonly
+stmtType' (SVarTuple tup optT e) = declareTuple tup optT e ReadWrite
+stmtType' (SLetTuple tup optT e) = declareTuple tup optT e Readonly
 
 stmtType' (SFunction f@(Function _ args retT stmt)) = do
     addFunc f
@@ -130,7 +111,7 @@ stmtType' (SExpr e) = void $ exprType e
 stmtType' (SIf e trueS falseS) = do
     exprType e >>= expectType TBool
     localScope $ stmtType trueS
-    localScope $ when (isJust falseS) (stmtType $ fromJust falseS)
+    localScope $ mapM_ stmtType falseS
 
 stmtType' (SWhile e stmt) = localScope $ do
     exprType e >>= expectType TBool
@@ -138,7 +119,7 @@ stmtType' (SWhile e stmt) = localScope $ do
 
 stmtType' (SFor n r stmt) = localScope $ do
     rangeType r
-    setVar n TInt True
+    setVar n TInt Readonly
     stmtType stmt
 
 stmtType' (SReturn e) = do
@@ -147,10 +128,15 @@ stmtType' (SReturn e) = do
         Just rT -> expectType rT eT
         Nothing -> throwError TCReturnOutside
 
+stmtType' (SAssign SEq n e) = do
+    expectRWVar n
+    vT <- varType n
+    exprType e >>= expectType vT
+
 stmtType' (SAssign _ n e) = do
     expectRWVar n
-    vT <- fromJust <$> varType n
-    exprType e >>= expectType vT
+    varType n >>= expectType TInt
+    exprType e >>= expectType TInt
 
 stmtType' (STupleAssign t e) = do
     expectRWTuple t
@@ -159,19 +145,37 @@ stmtType' (STupleAssign t e) = do
 
 stmtType' (SInc n) = do
     expectRWVar n
-    fromJust <$> varType n >>= expectType TInt
+    varType n >>= expectType TInt
 
 stmtType' (SDec n) = do
     expectRWVar n
-    fromJust <$> varType n >>= expectType TInt
+    varType n >>= expectType TInt
 
-stmtType' (SPrint es) = mapM_ (\e -> exprType e >>= expectType TString) es 
+stmtType' (SPrint es) = mapM_ (exprType >=> expectType TString) es 
+
+declareVar :: String -> Maybe Type -> Expr -> Access -> TCM ()
+declareVar name optT e access = do
+    eT <- exprType e
+    expectOptType optT eT
+    setVar name eT access
+
+declareTuple :: Tuple -> Maybe Type -> Expr -> Access -> TCM ()
+declareTuple tup optT e access = do
+    eT <- exprType e
+    expectOptType optT eT
+    tSkeleton <- tupleTypeSkeleton tup
+    expectMatch tSkeleton eT
+    setTuple tup eT access
 
 -- Range
 
 rangeType :: Range -> TCM ()
-rangeType (RExclusive e1 e2) = void $ exprType e1 >> exprType e2
-rangeType (RInclusive e1 e2) = void $ exprType e1 >> exprType e2
+rangeType (RExclusive e1 e2) = do
+    exprType e1 >>= expectType TInt
+    exprType e2 >>= expectType TInt
+rangeType (RInclusive e1 e2) = do 
+    exprType e1 >>= expectType TInt
+    exprType e2 >>= expectType TInt
 
 -- Expressions
 
@@ -184,9 +188,7 @@ exprType' (EBool _) = return TBool
 exprType' (EInt _) = return TInt
 exprType' (EString _) = return TString
 
-exprType' (EVar name) = do
-    expectVar name
-    fromJust <$> varType name
+exprType' (EVar name) = expectVar name >> varType name
 
 exprType' (ETuple es) = TTuple <$> mapM exprType es
 
@@ -234,7 +236,7 @@ exprType' (ELambda args retT stmt) = do
 functionImplType :: [TypedVar] -> Type -> Stmt -> TCM ()
 functionImplType args retT stmt = localScope $ do
     allReadonly
-    mapM_ (\(TypedVar n t) -> setVar n t True) args
+    mapM_ (\(TypedVar n t) -> setVar n t Readonly) args
     setReturnType retT
     stmtType stmt
 
@@ -245,10 +247,10 @@ tupleType (Tuple terms) = TTuple <$> mapM tupleTermType terms
 
 tupleTermType :: TupleTerm -> TCM Type
 tupleTermType (TupleTermTuple tp) = tupleType tp
-tupleTermType (TupleTermVar v) = fromJust <$> (expectVar v >> varType v)
+tupleTermType (TupleTermVar v) = expectVar v >> varType v
     
 tupleTypeSkeleton :: Tuple -> TCM TypeSkeleton
-tupleTypeSkeleton (Tuple terms) = TSTuple <$> (mapM tupleTermTypeSkeleton terms)
+tupleTypeSkeleton (Tuple terms) = TSTuple <$> mapM tupleTermTypeSkeleton terms
 
 tupleTermTypeSkeleton :: TupleTerm -> TCM TypeSkeleton
 tupleTermTypeSkeleton (TupleTermTuple tp) = tupleTypeSkeleton tp
@@ -259,39 +261,37 @@ tupleTermTypeSkeleton (TupleTermVar _) = return TSTerm
 -- lhs -> rhs -> expected type for lhs & rhs
 binOpType :: Expr -> Expr -> Type -> TCM Type
 binOpType e1 e2 t = do
-    t1 <- exprType e1
-    expectType t t1
-    t2 <- exprType e2
-    expectType t t2
+    exprType e1 >>= expectType t
+    exprType e2 >>= expectType t
     return t
 
 addFunc :: Function -> TCM ()
-addFunc (Function name args retT _) = setVar name t True
+addFunc (Function name args retT _) = setVar name t Readonly
     where
     t = TFunc $ map argType args ++ [retT]
 
-addBuiltinFunc :: EvalTypes.Builtin -> TCM ()
-addBuiltinFunc f = setVar n t True
+addBuiltinFunc :: Builtin -> TCM ()
+addBuiltinFunc f = setVar n t Readonly
     where
-    n = EvalTypes.name f
-    t = EvalTypes.fType f 
+    n = builtinName f
+    t = builtinType f 
 
 setReturnType :: Type -> TCM ()
-setReturnType t = setVar returnTypeID t True
+setReturnType t = setVar returnTypeID t Readonly
 
-setTuple :: Tuple -> Type -> Bool -> TCM ()
-setTuple (Tuple terms) (TTuple ts) readonly = 
-    mapM_ (\(term, t) -> setTupleTerm term t readonly) $ zip terms ts
-setTuple _ _ _ = undefined
+setTuple :: Tuple -> Type -> Access -> TCM ()
+setTuple (Tuple terms) (TTuple ts) access = 
+    zipWithM_ (\term t -> setTupleTerm term t access) terms ts
+setTuple _ _ _ = error "incorrect setTuple usage"
 
-setTupleTerm :: TupleTerm -> Type -> Bool -> TCM  ()
+setTupleTerm :: TupleTerm -> Type -> Access -> TCM  ()
 setTupleTerm (TupleTermVar v) = setVar v
 setTupleTerm (TupleTermTuple tup) = setTuple tup
 
-setVar :: String -> Type -> Bool -> TCM ()
-setVar n t readonly = do
+setVar :: String -> Type -> Access -> TCM ()
+setVar n t access = do
     expectFreeIdentifier n
-    modify $ Map.alter (\_ -> Just ((readonly, False), t)) n
+    modify $ Map.insert n ((access, CurrentScope), t)
 
 localScope :: TCM a -> TCM a
 localScope m = do
@@ -299,10 +299,10 @@ localScope m = do
     createScope >> m <* put st
 
 allReadonly :: TCM ()
-allReadonly = modify $ Map.map (\((_, scope), n) -> ((True, scope), n)) 
+allReadonly = modify $ Map.map (\((_, scope), n) -> ((Readonly, scope), n)) 
 
 createScope :: TCM ()
-createScope =  modify $ Map.map (\((ro, _), n) -> ((ro, True), n))
+createScope =  modify $ Map.map (\((access, _), n) -> ((access, OuterScope), n))
 
 expectMatch :: TypeSkeleton -> Type -> TCM ()
 expectMatch ts t = expectMatch' ts t ts t
@@ -310,13 +310,13 @@ expectMatch ts t = expectMatch' ts t ts t
 expectMatch' :: TypeSkeleton -> Type -> TypeSkeleton -> Type -> TCM ()
 expectMatch' outerTs outerT (TSTuple terms) (TTuple t) = do
     when (length terms /= length t) (throwError $ TCInvalidMatch outerTs outerT)
-    mapM_ (uncurry $ expectMatch' outerTs outerT) (zip terms t)
+    zipWithM_ (expectMatch' outerTs outerT) terms t
 expectMatch' _ _ TSTerm _ = return ()
-expectMatch' _ _ _ _ = undefined
+expectMatch' _ _ _ _ = error "incorrect expectMatch' usage"
 
-expectOptType :: Type -> Maybe Type -> TCM ()
-expectOptType _ Nothing = return ()
-expectOptType expected (Just t) = expectType expected t
+expectOptType ::Maybe Type -> Type -> TCM ()
+expectOptType Nothing _ = return ()
+expectOptType (Just expected) t = expectType expected t
 
 expectType :: Type -> Type -> TCM ()
 expectType expected actual =
@@ -343,7 +343,9 @@ expectFreeIdentifier name =
     varFromCurrentScope name >>= flip when (throwError $ TCRedeclaration name)
 
 returnType :: TCM (Maybe Type)
-returnType = varType returnTypeID
+returnType = do
+    st <- get
+    return $ snd <$> Map.lookup returnTypeID st
 
 returnTypeID :: String
 returnTypeID = "##return_type"
@@ -353,20 +355,19 @@ varFromCurrentScope v = do
     st <- get
     varExist v >>= \case
         False -> return False
-        True -> return $ not . snd . fst $ st ! v
+        True -> return $ case snd . fst $ st ! v of
+            CurrentScope -> True
+            OuterScope -> False
 
 varExist :: String -> TCM Bool
-varExist v = do
-    st <- get
-    return $ Map.member v st
+varExist v = gets $ Map.member v
 
 varReadonly :: String -> TCM Bool
 varReadonly v = do
     st <- get
-    return $ fst . fst $ st ! v 
+    case fst . fst $ st ! v of
+        Readonly -> return True
+        _ -> return False
 
-varType :: String -> TCM (Maybe Type)
-varType v = do
-    st <- get
-    return $ snd <$> Map.lookup v st
-
+varType :: String -> TCM Type
+varType v = gets $ snd . (!v)

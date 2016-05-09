@@ -9,16 +9,16 @@ import Eval.Types
 
 toString :: Builtin
 toString = Builtin {
-    name = "toString",
-    fType = TFunc [TInt, TString],
-    assocF = \[(VInt arg)] -> VString $ show arg
+    builtinName = "toString",
+    builtinType = TFunc [TInt, TString],
+    builtinFunc = \[VInt arg] -> VString $ show arg
 }
 
 fromString :: Builtin
 fromString = Builtin {
-    name = "fromString",
-    fType = TFunc [TString, TInt],
-    assocF = \[(VString arg)] -> VInt $ read arg
+    builtinName = "fromString",
+    builtinType = TFunc [TString, TInt],
+    builtinFunc = \[VString arg] -> VInt $ read arg
 }
 
 builtins :: [Builtin]

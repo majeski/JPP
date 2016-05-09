@@ -41,10 +41,10 @@ languageDef = emptyDef {
 Token.TokenParser{..} = Token.makeTokenParser languageDef
 
 parseAST :: String -> Either ParseError Program
-parseAST raw = parse (whiteSpace >> program <* eof) "" raw
+parseAST = parse (whiteSpace >> program <* eof) "" 
 
 parseExpr :: String -> Either ParseError Expr
-parseExpr raw = parse (whiteSpace >> expr <* eof) "" raw
+parseExpr = parse (whiteSpace >> expr <* eof) "" 
 
 -- Program
 
@@ -70,9 +70,9 @@ function = do
 expr :: Parser Expr
 expr = buildExpressionParser table term
 term = choice
-    [ natural >>= return . EInt
-    , stringLiteral >>= return . EString
-    , boolLiteral >>= return . EBool
+    [ EInt <$> natural
+    , EString <$> stringLiteral 
+    , EBool <$> boolLiteral
     , try tupleExpr
     , callExpr
     , lambdaExpr ]
@@ -111,11 +111,11 @@ boolLiteral = choice
     , reserved "false" >> return False ]
 
 tupleExpr :: Parser Expr
-tupleExpr = ETuple <$> (parens $ expr `sepBy2` comma)
+tupleExpr = ETuple <$> parens (expr `sepBy2` comma)
 
 callExpr :: Parser Expr
 callExpr = do
-    fun <- (identifier >>= return . EVar) <|> parens expr
+    fun <- (EVar <$> identifier) <|> parens expr
     args <- optionMaybe $ many1 exprList
     return $ createCall fun args
     where
@@ -223,12 +223,12 @@ whileStmt = do
     return $ SWhile cond block
 
 returnStmt :: Parser Stmt
-returnStmt = reserved "return" >> expr >>= return . SReturn
+returnStmt = SReturn <$> (reserved "return" >> expr)
 
 postfixStmt :: Parser Stmt
-postfixStmt =
-    try (identifier <* reservedOp "++" >>= return . SInc) <|>
-    (identifier <* reservedOp "--" >>= return . SDec)
+postfixStmt =  
+    try (SInc <$> (identifier <* reservedOp "++")) <|>
+    (SDec <$> (identifier <* reservedOp "--"))
 
 assignStmt :: Parser Stmt
 assignStmt = identifier >>= \var -> choice $ map ($ var)
@@ -250,7 +250,7 @@ tupleAssignStmt = do
 -- Tuple 
 
 tuple :: Parser Tuple
-tuple = Tuple <$> (parens $ tupleTerm `sepBy2` comma)
+tuple = Tuple <$> parens (tupleTerm `sepBy2` comma)
 
 tupleTerm :: Parser TupleTerm
 tupleTerm = 
@@ -306,7 +306,7 @@ functionTypeNoArgs = do
     return [retT]
 
 tupleType :: Parser Type
-tupleType = TTuple <$> (parens $ typeLiteral `sepBy2` comma)
+tupleType = TTuple <$> parens (typeLiteral `sepBy2` comma)
 
 -- Helpers
 
@@ -315,5 +315,3 @@ sepBy2 arg sep = do
     first <- arg <* sep
     rest <- arg `sepBy1` sep
     return $ first:rest
-
-

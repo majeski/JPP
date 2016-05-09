@@ -10,15 +10,14 @@ import Eval.TypeCheck
 import Eval.Runtime
 
 main :: IO ()
-main = do
-    filename <- head <$> getArgs
-    withFile filename ReadMode interpreter
+main = getArgs >>= \case
+    [filename] -> withFile filename ReadMode interpreter
+    _ -> hPutStrLn stderr $ "Usage: ./interpreter path_to_code"
 
 interpreter :: Handle -> IO ()
 interpreter handle = do
     content <- hGetContents handle
-    let result = parse content >>= checkTypes
-    case result of
+    case parse content >>= checkTypes of
         Left err -> hPutStrLn stderr $ "ERR:\n" ++ err
         Right p -> run p
 
