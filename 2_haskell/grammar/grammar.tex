@@ -25,7 +25,9 @@
 \begin{grammar}
 <type> ::= <simple-type> | <function-type>
 
-<simple-type> ::= "Int" | "Bool" | "String"
+<simple-type> ::= "Int" | "Bool" | "String" | <tuple-type>
+
+<tuple-type> ::= "(" <type> ", " <type> \{", " <type> \} ")"
 
 <function-type> ::= <function-type-no-arguments> | <function-type-with-arguments>
 
@@ -57,7 +59,9 @@
 
 <expression-2> ::= <term> \{("*" | "/" | "%") <term>\}
 
-<term> ::= <literal> | <identifier> | <call-expression> | <parentheses-expression> | <lambda-expression>
+<term> ::= <literal> | <identifier> | <call-expression> | <parentheses-expression> | <lambda-expression> | <tuple-expression> 
+
+<tuple-expression> ::= "(" <expression> ", " <expression> \{ ", " <expression> \} ")"
 
 <call-expression> ::= <term> "(" [<expressions-list>] ")"
 
@@ -66,19 +70,23 @@
 <parentheses-expression> ::= "(" <expression> ")"
 
 <lambda-expression> ::= "lambda" <arguments-list> "->" <function-arg-type> <code-block>
+
 \end{grammar}
 
 
 \section{Statements}
 \begin{grammar}
-<statement> ::= ((<declaration> | <print-statement> | <assign-statement> | <postfix-statement> |
-<expression>) ";") | <flow-statement> | <statements-list>
+<statement> ::= <statement-term> [<statement>]
 
-<statements-list> ::= <statement> [<statements-list>]
+<statement-term> ::= ((<simple-declaration> | <print-statement> | <assign-statement> | <postfix-statement> | <expression>) ";") | <flow-statement> | <function-declaration>
 
 <print-statement> ::= "print" <expressions-list>
 
-<assign-statement> ::= <identifier> <assign-operator> <expression>
+<assign-statement> ::= <tuple-assign-statement> | <var-assign-statement>
+
+<tuple-assign-statement> ::= <tuple-identifiers> "=" <expression>
+
+<var-assign-statement> ::= <identifier> <assign-operator> <expression>
 
 <assign-operator> ::= "=" | "-=" | "+=" | "*=" | "/=" | "%="
 
@@ -96,16 +104,17 @@
 
 <return-statement> ::= "return" <expression>
 
-<code-block> ::= "{" [<statements-list>] "}"
+<code-block> ::= "{" [<statement>] "}"
 \end{grammar}
 
 \section{Declarations}
 \begin{grammar}
-<simple-declaration> ::= <variable-declaration> | <constant-declaration> | <function-declaration>
 
-<constant-declaration> ::= "let" (<identifier> | <typed-identifier>) "=" <expression>
+<simple-declaration> ::= <variable-declaration> | <constant-declaration> 
 
-<variable-declaration> ::= "var" (<identifier> | <typed-identifier>) "=" <expression>
+<constant-declaration> ::= "let" (<identifier> | <tuple-identifiers>) [":" <type>] "=" <expression>
+
+<variable-declaration> ::= "var" (<identifier> | <tuple-identifiers>) [":" <type>] "=" <expression>
 
 <function-declaration> ::= "func" <identifier> <arguments-list> "->" <function-arg-type> <code-block>
 
@@ -114,6 +123,8 @@
 <typed-identifiers-list> ::= <typed-identifier> [", " <typed-identifiers-list>]
 
 <typed-identifier> ::= <identifier> ":" <type>
+
+<tuple-identifiers> ::= "(" <identifier> ", " <identifier> \{ ", " <identifier> \} ")"
 
 <identifier> ::= (<letter> | "_"), \{<letter> | <digit> | "_"\}
 

@@ -1,7 +1,7 @@
 This is a statically typed imperative language inspired by Swift.
-It uses 3 builtin types: Bool, Int and String and allows to create functions with any type that is a combination of the builtin types.
+It uses 3 builtin types: Bool, Int and String and allows to create tuples and functions with any type that is a combination of the builtin types.
 Runtime errors (e.g. division by 0) are handled by interpreter.
-It treats functions as first-class citizens. There are recursive global functions and local lambdas.
+It treats functions as first-class citizens.
 
 Non-obvious elements:
 
@@ -10,41 +10,54 @@ var - variable
 let - constant
 the only difference is that operators = += -= *= /= %= ++ -- cannot be applied on a constant
 
-
-2. For loop:
-for <identifier> in <range> { }
-<identifier> behaves like a constant
-<range> is either: <expr> ... <expr> or <expr> ..< <expr>. 
-Range example:
-1 ... 5 means from 1 to 5 inclusively
-1 ..< 5 means from 1 to (5-1) inclusively
-
 let <identifier> = <expr>;
 var <identifier> = <expr>;
 
 there is no need to write a type for a new variable/constant, it's deduced from given expression
 
 
-3. Print
+2. Tuples
+let and var also work with tuples
+
+let (a, b, c) = (1, (2, 3), 4)
+where expression on the right has a type (Int, (Int, Int), Int) hence
+`a` and `c` have a type Int, but `b` is (Int, Int)
+
+let/var applies for every identifier inside tuple
+
+assignment is also possible outside a declaration
+(a, b) = (c, (5, a))
+
+
+3. For loop
+for <identifier> in <range> { }
+<identifier> behaves like a constant
+<range> is either: <expr> ... <expr> or <expr> ..< <expr>. 
+Range examples:
+1 ... 5 -- from 1 to 5 inclusively
+1 ..< 5 -- from 1 to (5-1) inclusively
+5 ... 1 -- from 5 to 1 inclusively
+
+
+4. Print
 print <expr>, <expr>, ...
 where each <expr> should be of type String
 
 
-4. Functions and lambdas
-Functions can be declared only in the global scope.
-Lambdas can be declared only in local scope.
-Their arguments are constant. Lambdas have access to the outer scope, they retain constant copy of every variable in scope at declaration.
+5. Functions and lambdas
+The main difference between functions and lambdas is that functions are recursive.
+Their arguments are constant. Functions have access to the outer scope, they retain constant copy of every variable in scope at declaration.
 Functions and lambdas always return some value, but they may have no arguments.
 
 Both declarations are very similar:
 
-global function:
-func <identifier> (arg1: Type1, arg2: Type2, ...) -> ReturnType { };
+function:
+func <identifier> (arg1: Type1, arg2: Type2, ...) -> ReturnType { }
 
 lambda:
 let/var <identifier> = lambda (arg1: Type1, arg2: Type2, ...) -> ReturnType { };
 
-Type is either Bool, Int, String or a function type. Function/lambda type can be either:
+Type is either Bool, Int, String, a tuple type or a function type. Function/lambda type can be either:
 Void -> ReturnType (Void means simply no arguments)
 or
 ArgType1 -> ArgType2 -> ... -> ReturnType
@@ -55,25 +68,25 @@ has a type:
 Int -> (Int -> Bool) -> String -> Bool
 
 
-5. Builtin functions
+6. Builtin functions
 fromString (type: Int -> String)
 toString (type: String -> Int)
 
 
-6. Functions binding
+7. Functions binding
 ff :: arg_1 :: arg_2 :: ... :: arg_k
 the result is a new function with the same arguments as ff expect the first k arguments which are filled with values of arg_1, arg_2, ..., arg_k
 
 
-7. Scopes
+8. Scopes
 You can redeclare indentifier from the outer scope (even if its type is different), but not from the same scope.
 
 
-8. The global scope
+9. The global scope
 Program starts running from the main block. Outside that block are function declarations. Functions defined at global scope are mutually recursive.
 
 
-9. Operators in descending precedence (every operator is left associative)
+10. Operators in descending precedence (every operator is left associative)
 () - call operator
 * / %
 + -
@@ -81,5 +94,4 @@ Program starts running from the main block. Outside that block are function decl
 ||
 :: - bind operator
 = += -= *= /= %= ++ --
-
 
