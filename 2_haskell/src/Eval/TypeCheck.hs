@@ -46,7 +46,7 @@ instance Show TypeCheckError where
     show TCInvalidBind = "cannot bind value to function without arguments"
     show (TCNotAFunction actual) = "not a function type: " ++ showType actual
     show (TCUndefinedVar name) = "undefined identifier '" ++ name ++ "'"
-    show (TCRedeclaration name) = "cannot redeclare identifier'" ++ name ++ "' in the same scope"
+    show (TCRedeclaration name) = "cannot redeclare identifier '" ++ name ++ "' in the same scope"
     show (TCReadonlyVar name) = "invalid operation on readonly identifier '" ++ name ++ "'"
     show (TCInvalidType expected actual) = intercalate "\n"
         [ "invalid type"
@@ -210,10 +210,10 @@ exprType' (EBinOp EBind f arg) = do
     ft <- exprType f
     argt <- exprType arg
     case ft of
-        TFunc (farg:args) -> do 
+        TFunc (farg:args:rest) -> do 
             expectType farg argt
-            return $ TFunc args
-        TFunc [] -> throwError TCInvalidBind
+            return $ TFunc $ args:rest
+        TFunc _ -> throwError TCInvalidBind
         _ -> throwError $ TCNotAFunction ft 
 
 exprType' (ECall f args) = do 
@@ -308,11 +308,11 @@ expectMatch :: TypeSkeleton -> Type -> TCM ()
 expectMatch ts t = expectMatch' ts t ts t
 
 expectMatch' :: TypeSkeleton -> Type -> TypeSkeleton -> Type -> TCM ()
-expectMatch' outerTs outerT (TSTuple terms) (TTuple t) = do
-    when (length terms /= length t) (throwError $ TCInvalidMatch outerTs outerT)
-    zipWithM_ (expectMatch' outerTs outerT) terms t
+expectMatch' outerTs outerT (TSTuple terms) (TTuple tupTs) = do
+    when (length terms /= length tupTs) (throwError $ TCInvalidMatch outerTs outerT)
+    zipWithM_ (expectMatch' outerTs outerT) terms tupTs
 expectMatch' _ _ TSTerm _ = return ()
-expectMatch' _ _ _ _ = error "incorrect expectMatch' usage"
+expectMatch' outerTs outerT _ _ = throwError $ TCInvalidMatch outerTs outerT
 
 expectOptType ::Maybe Type -> Type -> TCM ()
 expectOptType Nothing _ = return ()

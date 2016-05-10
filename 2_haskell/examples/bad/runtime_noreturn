@@ -1,0 +1,10 @@
+main: {
+    print toString(f(2));
+    print toString(f(3));
+}
+
+func f(x: Int) -> Int {
+    if x % 2 == 0 {
+        return x;
+    }
+}

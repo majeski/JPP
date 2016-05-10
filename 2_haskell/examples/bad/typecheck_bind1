@@ -1,0 +1,7 @@
+main: {
+    f :: 3;
+}
+
+func f() -> Int {
+    return 0;
+}

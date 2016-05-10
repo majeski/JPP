@@ -1,0 +1,6 @@
+main: {
+    let a = fromString("123");
+    print toString(a);
+    let b = fromString("asd");
+    print toString(b);
+}

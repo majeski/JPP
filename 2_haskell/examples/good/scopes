@@ -1,0 +1,44 @@
+main: {
+    var f = f1;
+    print f();
+
+    if true {
+        print f();
+
+        var a = "";
+        func f() -> String {
+            return a;
+        }
+        a = "function from if";
+
+        func toString(x: Int) -> String {
+            return "local toString";
+        }
+
+        print f();
+        print toString(5);
+    }
+
+    f = f2();
+    print f();
+
+    func f3(x: Int) -> Int {
+        print "recursive f3", toString(x);
+        if x > 0 {
+            return f3(x - 1);
+        }
+        return x;
+    }
+    print "f3 result =", toString(f3(3));
+}
+
+func f1() -> String {
+    return "function f1 from global scope";
+}
+
+func f2() -> (Void -> String) {
+    let a = "lambda in function f2 from global scope";
+    return lambda() -> String {
+        return a;
+    };
+}

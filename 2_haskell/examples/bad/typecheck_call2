@@ -1,0 +1,7 @@
+main: {
+    f(2, "asd");    
+}
+
+func f(x: Int, y: String, z: Bool) -> Int {
+    return 0;
+}

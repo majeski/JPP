@@ -12,7 +12,7 @@ import Eval.Runtime
 main :: IO ()
 main = getArgs >>= \case
     [filename] -> withFile filename ReadMode interpreter
-    _ -> hPutStrLn stderr $ "Usage: ./interpreter path_to_code"
+    _ -> hPutStrLn stderr "Usage: ./interpreter path_to_code"
 
 interpreter :: Handle -> IO ()
 interpreter handle = do

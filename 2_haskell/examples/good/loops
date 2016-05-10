@@ -1,0 +1,47 @@
+main: {
+    var i = 0;
+
+    print "while (i < 5)";
+    i = 0;
+    print toString(i);
+    while i < id(5) {
+        i++;
+        print toString(i);
+    }
+    print "while end";
+    print "";
+
+    print "for 1...5";
+    i = 3;
+    for i in id(1) ... id(5) {
+        print toString(i);
+    }
+    print "for end";
+    print "i =", toString(i);
+    print "";
+
+    print "for 5...1";
+    for i in id(5) ... id(1) {
+        print toString(i);
+    }
+    print "for end";
+    print "";
+
+    print "for 1 ..< 5 (start with i = 1, run as long as i < 5)";
+    for i in id(1) ..< id(5) {
+        print toString(i);
+    }
+    print "for end";
+    print "";
+
+    print "for 5 ..< 1 (start with i = 5, run as long as i < 1)";
+    for i in id(5) ..< id(1) {
+        print toString(i);
+    }
+    print "for end";
+}
+
+func id(x: Int) -> Int {
+    print "id(", toString(x), ")";
+    return fromString(toString(x));
+}

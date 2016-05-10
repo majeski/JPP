@@ -1,0 +1,4 @@
+main: {
+    var a = "asd";
+    a = 4;
+}

@@ -1,0 +1,4 @@
+main: {
+    var a = true;
+    a += 3;
+}

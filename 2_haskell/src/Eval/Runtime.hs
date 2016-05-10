@@ -22,10 +22,12 @@ import qualified Eval.Builtins as Builtins
 data RuntimeError
     = RENoReturn
     | REDivByZero
+    | REBuiltinFailed String
 
 instance Show RuntimeError where
     show RENoReturn = "function exited without return"
     show REDivByZero = "division by zero"
+    show (REBuiltinFailed f) = "builtin function `" ++ f ++ "` failed"
 
 type IM = StateT Env (ExceptT RuntimeError (ContT (Either RuntimeError ()) IO))
 data Env = Env Memory (Maybe (Value -> IM ()))
@@ -124,7 +126,7 @@ evalRange (RInclusive be ee) = do
     VInt b <- evalExpr be
     VInt e <- evalExpr ee
     let next = if b <= e then succ else pred
-    return (b, (==e), next)
+    return (b, (== next e), next)
 
 -- Expressions
 
@@ -143,7 +145,9 @@ evalExpr (ECall e callArgs) = do
     VFunction boundArgs impl <- evalExpr e
     argVals <- (reverse boundArgs ++) <$> mapM evalExpr callArgs
     case impl of
-        FIBuiltin b -> return $ builtinFunc b argVals
+        FIBuiltin b -> case builtinFunc b argVals of
+                Just res -> return res
+                Nothing -> throwError $ REBuiltinFailed $ builtinName b
         FIUser argNames stmt mem -> localEval $ callCC $ \c -> do
             put $ Env mem (Just c)
             zipWithM_ setVal argNames argVals

@@ -1,0 +1,7 @@
+main: {
+    if true {
+        let x = 3;
+    }
+
+    x++;
+}

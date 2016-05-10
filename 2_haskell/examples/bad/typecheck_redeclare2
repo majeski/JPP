@@ -1,0 +1,11 @@
+main: {
+    
+}
+
+func f() -> Int {
+    return 0;
+}
+
+func f() -> Int {
+    return 1;
+}

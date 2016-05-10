@@ -1,0 +1,24 @@
+main: {
+    let a = 1;
+    let b: Int = 2;
+    let c = (3, true);
+    let d: (Int, Bool) = (4, true);
+
+    func local(x: Int) -> Int {
+        return x;
+    }
+
+    let e = lambda(x: (Int, Bool)) -> String {
+        let (y, z) = x;
+        return toString(y);
+    };
+    
+    print toString(a), toString(b), e(c), e(d), toString(local(5));
+}
+
+func global() -> Int {
+    func local() -> Int {
+        return global();
+    }
+    return local();
+}

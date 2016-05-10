@@ -25,7 +25,7 @@ data FunctionImpl
 data Builtin = Builtin {
     builtinName :: String,
     builtinType :: Type,
-    builtinFunc :: [Value] -> Value
+    builtinFunc :: [Value] -> Maybe Value
 }
 
 type Memory = Map String (IORef Value)

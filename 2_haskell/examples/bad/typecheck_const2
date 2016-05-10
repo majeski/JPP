@@ -1,0 +1,9 @@
+main: {
+    var a = 0;
+    a++;
+
+    func f() -> Int {
+        a++;
+        return a;
+    }
+}

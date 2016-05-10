@@ -46,7 +46,7 @@ where each <expr> should be of type String
 
 5. Functions and lambdas
 The main difference between functions and lambdas is that functions are recursive.
-Their arguments are constant. Functions have access to the outer scope, they retain constant copy of every variable in scope at declaration.
+Their arguments are constant. Functions have access to the outer scope, they retain constant link to every variable in scope at declaration.
 Functions and lambdas always return some value, but they may have no arguments.
 
 Both declarations are very similar:

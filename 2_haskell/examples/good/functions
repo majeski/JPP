@@ -1,0 +1,85 @@
+main: {
+    var f: Void -> String = lambda() -> String {
+        return toString(f1(4));
+    };
+    print "-- #1 --"; 
+    f();
+    print "";
+
+    f = toString :: 3;
+    print "-- #2 --";
+    print f();
+    print (toString :: 3)();
+    print "";
+
+    var getToString: Void -> (Int -> String) = lambda() -> (Int -> String) {
+        return toString;
+    };
+
+    print "-- #3 --";
+    f = getToString() :: 4;
+    print (getToString() :: 4)();
+    print f();
+    print "";
+
+    print "-- #4 --";
+    let addAll = execAll :: (calc :: "+" :: add);
+    let powAll = execAll :: (calc :: "^" :: pow);
+
+    addAll(2, 4);
+    powAll(3, 5);
+}
+
+func execAll(fun: Int -> Int -> Int, x: Int, y: Int) -> Int {
+    for i in x...y {
+        let f = fun :: i;
+        for j in x...y {
+            f(j);
+        }
+    }
+    return 0;
+}
+
+func calc(op: String, opF: Int -> Int -> Int, x: Int, y: Int) -> Int {
+    print toString(x), op, toString(y), "=", toString(opF(x, y));
+    return 0;
+}
+
+func add(x: Int, y: Int) -> Int {
+    return x + y;
+}
+
+func pow(x: Int, y: Int) -> Int {
+    var res = 1;
+    for i in 1...y {
+        res *= x;
+    }
+    return res;
+}
+
+func f1(x: Int) -> Int {
+    func f2(f: Int -> Int, x: Int) -> Int {
+        f(x);
+        return 0;
+    }
+
+    print toString(x);
+    if x - 1 == 0 {
+        return 0;
+    }
+    f2(f3, x - 1);
+    print toString(x);
+
+    return 0;
+}
+
+func f3(x: Int) -> Int {
+    print toString(0 - x);
+    if x - 1 == 0 {
+        return 0;
+    }
+    f1(x - 1);
+    print toString(0 - x);
+
+    return 0;
+}
