@@ -11,24 +11,20 @@ TorusTransformedWalk comment: ''!
 !TorusTransformedWalk methodsFor!
 
 do: operation
-	walk do: [:p | (p perform: transformation with: arg) do: operation]!
+	walk do: [:p | (transformation value: p) do: operation]!
 
-init: w withTransformation: t parameter: p
+init: w withTransformation: t
 	walk := w.
-	transformation := t.
-	arg := p! !
+	transformation := t! !
 !TorusTransformedWalk categoriesFor: #do:!public! !
-!TorusTransformedWalk categoriesFor: #init:withTransformation:parameter:!private! !
+!TorusTransformedWalk categoriesFor: #init:withTransformation:!private! !
 
 !TorusTransformedWalk class methodsFor!
 
-new: w withTransformation: s parameter: p
+new: w withTransformation: t
 	| r |
 	r := self basicNew.
-	r
-		init: w
-		withTransformation: s
-		parameter: p.
+	r init: w withTransformation: t.
 	^r! !
-!TorusTransformedWalk class categoriesFor: #new:withTransformation:parameter:!public! !
+!TorusTransformedWalk class categoriesFor: #new:withTransformation:!public! !
 

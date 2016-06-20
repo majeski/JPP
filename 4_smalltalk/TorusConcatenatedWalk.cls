@@ -1,7 +1,7 @@
 "Filed out from Dolphin Smalltalk 7"!
 
 TorusWalk subclass: #TorusConcatenatedWalk
-	instanceVariableNames: 'walk1 walk2'
+	instanceVariableNames: 'walks'
 	classVariableNames: ''
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
@@ -10,22 +10,29 @@ TorusConcatenatedWalk comment: ''!
 !TorusConcatenatedWalk categoriesForClass!Kernel-Objects! !
 !TorusConcatenatedWalk methodsFor!
 
-do: operation
-	walk1 do: operation.
-	walk2 do: operation!
+, w
+	| newWalks |
+	newWalks := OrderedCollection new.
+	newWalks
+		addAllLast: walks;
+		addLast: w.
+	^TorusConcatenatedWalk newWith: newWalks!
 
-initWith: w1 and: w2
-	walk1 := w1.
-	walk2 := w2! !
+do: operation
+	walks do: [:w | w do: operation]!
+
+initWith: ws
+	walks := ws! !
+!TorusConcatenatedWalk categoriesFor: #,!public! !
 !TorusConcatenatedWalk categoriesFor: #do:!public! !
-!TorusConcatenatedWalk categoriesFor: #initWith:and:!private! !
+!TorusConcatenatedWalk categoriesFor: #initWith:!private! !
 
 !TorusConcatenatedWalk class methodsFor!
 
-newWith: w1 and: w2
+newWith: ws
 	| r |
 	r := self basicNew.
-	r initWith: w1 and: w2.
+	r initWith: ws.
 	^r! !
-!TorusConcatenatedWalk class categoriesFor: #newWith:and:!public! !
+!TorusConcatenatedWalk class categoriesFor: #newWith:!public! !
 

@@ -11,19 +11,18 @@ TorusWalk comment: ''!
 !TorusWalk methodsFor!
 
 % x
-	^TorusTransformedWalk
-		new: self
-		withTransformation: #%
-		parameter: x!
+	^TorusTransformedWalk new: self withTransformation: [:p | p % x]!
 
 , walk2
-	^TorusConcatenatedWalk newWith: self and: walk2!
+	| walks |
+	walks := OrderedCollection new.
+	walks
+		addLast: self;
+		addLast: walk2.
+	^TorusConcatenatedWalk newWith: walks!
 
 | x
-	^TorusTransformedWalk
-		new: self
-		withTransformation: #|
-		parameter: x!
+	^TorusTransformedWalk new: self withTransformation: [:p | p | x]!
 
 add: _
 	^self shouldNotImplement!
